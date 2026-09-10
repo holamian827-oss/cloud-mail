@@ -33,10 +33,12 @@
    --------------------------------------------------------------------------- */
 
 html:root {
-	/* 外壳面板：偏冷的中性白，透明度决定「玻璃感」强弱 */
-	--glass-surface: rgba(255, 255, 255, 0.58);
-	--glass-surface-strong: rgba(255, 255, 255, 0.76);
-	--glass-surface-soft: rgba(255, 255, 255, 0.42);
+	/* 外壳面板：偏冷的中性白，透明度决定「玻璃感」强弱。
+	   这三个值是「质感」的主开关 —— 调低更通透、更看得出底纹，但正文对比度也会下降。
+	   0.38 是实测下来既能看清色晕、正文又有 10:1 左右对比度的位置。 */
+	--glass-surface: rgba(255, 255, 255, 0.38);
+	--glass-surface-strong: rgba(255, 255, 255, 0.70);
+	--glass-surface-soft: rgba(255, 255, 255, 0.30);
 
 	/* 玻璃的「边缘」：一道亮描边 + 一道冷灰分隔，模仿真实玻璃的折射 */
 	--glass-hairline: rgba(255, 255, 255, 0.68);
@@ -47,8 +49,10 @@ html:root {
 	--glass-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 32px rgba(15, 23, 42, 0.10);
 	--glass-shadow-lg: 0 2px 8px rgba(15, 23, 42, 0.06), 0 24px 64px rgba(15, 23, 42, 0.18);
 
-	/* 侧栏是深色玻璃，和浅色内容区形成层次 */
-	--glass-aside-bg: rgba(26, 28, 38, 0.62);
+	/* 侧栏是深色玻璃，和浅色内容区形成层次。
+	   透明度不能给太高：0.62 时叠在浅色底纹上会变成一片中灰，
+	   深夜蓝黑（原设计 #191A23）的沉稳感就没了。0.82 既压得住，又能透出一点色晕。 */
+	--glass-aside-bg: rgba(26, 28, 38, 0.82);
 	--glass-aside-hairline: rgba(255, 255, 255, 0.10);
 
 	--glass-blur: 22px;
@@ -63,16 +67,16 @@ html:root {
 	   注意：底纹色晕（那几团径向渐变）不在这里，而是内联在 index.html 的
 	   html::before 里 —— 首屏在 bundle 加载前就要有背景，否则会白闪一下。
 	   两处用的是同一组色值，改调色板时记得一起改。 */
-	--glass-page-base: #eef2f8;
+	--glass-page-base: #f1f3fa;
 
 	/* 浮层遮罩 */
 	--glass-mask: rgba(15, 23, 42, 0.32);
 }
 
 html.dark:root {
-	--glass-surface: rgba(24, 27, 36, 0.60);
-	--glass-surface-strong: rgba(29, 33, 43, 0.78);
-	--glass-surface-soft: rgba(24, 27, 36, 0.44);
+	--glass-surface: rgba(24, 27, 36, 0.46);
+	--glass-surface-strong: rgba(29, 33, 43, 0.72);
+	--glass-surface-soft: rgba(24, 27, 36, 0.32);
 
 	--glass-hairline: rgba(255, 255, 255, 0.10);
 	--glass-edge: rgba(255, 255, 255, 0.08);
@@ -81,10 +85,10 @@ html.dark:root {
 	--glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.30), 0 8px 32px rgba(0, 0, 0, 0.42);
 	--glass-shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.35), 0 24px 64px rgba(0, 0, 0, 0.55);
 
-	--glass-aside-bg: rgba(15, 17, 24, 0.66);
+	--glass-aside-bg: rgba(15, 17, 24, 0.80);
 	--glass-aside-hairline: rgba(255, 255, 255, 0.08);
 
-	--glass-page-base: #0a0c12;
+	--glass-page-base: #0b0d14;
 
 	--glass-mask: rgba(0, 0, 0, 0.45);
 }
@@ -96,12 +100,14 @@ html.dark:root {
    --------------------------------------------------------------------------- */
 
 html:root {
-	/* 略透的白色表面，让底下的色晕透出来一点 */
-	--el-bg-color: rgba(255, 255, 255, 0.72);
+	/* 略透的白色表面，让底下的色晕透出来一点。
+	   浮层（overlay）反而要给得比内容区更实：它下面压着的是内容不是底纹，
+	   太透会让对话框里的字和背后的列表糊在一起。 */
+	--el-bg-color: rgba(255, 255, 255, 0.55);
 	--el-bg-color-page: transparent;
-	--el-bg-color-overlay: rgba(255, 255, 255, 0.80);
-	--el-fill-color-blank: rgba(255, 255, 255, 0.50);
-	--el-fill-color-light: rgba(255, 255, 255, 0.40);
+	--el-bg-color-overlay: rgba(255, 255, 255, 0.86);
+	--el-fill-color-blank: rgba(255, 255, 255, 0.40);
+	--el-fill-color-light: rgba(255, 255, 255, 0.32);
 
 	--el-border-radius-base: var(--glass-radius-sm);
 	--el-border-radius-small: 8px;
@@ -114,8 +120,8 @@ html:root {
 }
 
 html.dark:root {
-	--el-bg-color: rgba(24, 27, 36, 0.72);
-	--el-bg-color-overlay: rgba(29, 33, 43, 0.84);
+	--el-bg-color: rgba(24, 27, 36, 0.60);
+	--el-bg-color-overlay: rgba(29, 33, 43, 0.88);
 	--el-fill-color-blank: rgba(255, 255, 255, 0.06);
 	--el-fill-color-light: rgba(255, 255, 255, 0.08);
 }
@@ -129,10 +135,10 @@ html:root {
 	--light-ill: rgba(255, 255, 255, 0.36);
 	--base-fill: rgba(255, 255, 255, 0.42);
 	--loadding-background: rgba(255, 255, 255, 0.55);
-	--email-hover-background: rgba(24, 144, 255, 0.09);
+	--email-hover-background: rgba(76, 110, 245, 0.09);
 	--email-right-click-background: rgba(255, 211, 125, 0.22);
 	/* 账户面板选中项：原本是实心主色浅色块，改成透光的主色薄雾 */
-	--choose-account-background: rgba(24, 144, 255, 0.12);
+	--choose-account-background: rgba(76, 110, 245, 0.12);
 }
 
 html.dark:root {
@@ -141,9 +147,9 @@ html.dark:root {
 	--light-ill: rgba(255, 255, 255, 0.07);
 	--base-fill: rgba(255, 255, 255, 0.08);
 	--loadding-background: rgba(0, 0, 0, 0.45);
-	--email-hover-background: rgba(24, 144, 255, 0.16);
+	--email-hover-background: rgba(76, 110, 245, 0.16);
 	--email-right-click-background: rgba(255, 211, 125, 0.12);
-	--choose-account-background: rgba(24, 144, 255, 0.20);
+	--choose-account-background: rgba(76, 110, 245, 0.20);
 }
 
 /* ---------------------------------------------------------------------------
@@ -373,11 +379,11 @@ body .el-message {
 }
 
 #app .el-button--primary:not(.is-link):not(.is-text) {
-	box-shadow: 0 4px 14px rgba(24, 144, 255, 0.28);
+	box-shadow: 0 4px 14px rgba(76, 110, 245, 0.28);
 }
 
 #app .el-button--primary:not(.is-link):not(.is-text):hover {
-	box-shadow: 0 6px 20px rgba(24, 144, 255, 0.36);
+	box-shadow: 0 6px 20px rgba(76, 110, 245, 0.36);
 	transform: translateY(-1px);
 }
 
@@ -453,10 +459,24 @@ body .el-message {
    后者会在每一帧对 350px 的方块重新做高斯模糊，飘动时开销很大，
    而渐变只是换个背景，等于零性能代价换掉整页观感。
    飘动动画（margin-left）保持不动，所以节奏和原来完全一致。 */
+/* 容器改成定位基准并裁切：光晕要能大于容器，又不能撑出滚动条 */
+#app #login-box #background-wrap {
+	position: relative;
+	overflow: hidden;
+}
+
+/* 关键：**大尺寸 + 低透明度**。
+   原来那样 350×120 的小box 配 0.5 透明度，在浅底上会缩成一个个深色小椭圆，
+   看着像屏幕上的污渍，而不是光晕。做大到 680px、把透明度压到 0.2 以下，
+   再靠容器裁切，才会变成柔和的光雾。
+   原有的漂移动画（margin-left）和各自的 scale 都保持不动。 */
 #app #login-box .cloud {
+	position: absolute;
+	width: 680px;
+	height: 680px;
+	border-radius: 50%;
 	background: none;
 	box-shadow: none;
-	border-radius: 50%;
 }
 
 #app #login-box .cloud::before,
@@ -465,23 +485,33 @@ body .el-message {
 }
 
 #app #login-box .x1.cloud {
-	background: radial-gradient(closest-side, rgba(24, 144, 255, 0.50), transparent 72%);
+	top: -20%;
+	left: -8%;
+	background: radial-gradient(closest-side, rgba(76, 110, 245, 0.20), transparent 78%);
 }
 
 #app #login-box .x2.cloud {
-	background: radial-gradient(closest-side, rgba(124, 92, 255, 0.46), transparent 72%);
+	top: 6%;
+	left: 34%;
+	background: radial-gradient(closest-side, rgba(121, 80, 242, 0.17), transparent 78%);
 }
 
 #app #login-box .x3.cloud {
-	background: radial-gradient(closest-side, rgba(34, 211, 238, 0.42), transparent 72%);
+	top: 42%;
+	left: 4%;
+	background: radial-gradient(closest-side, rgba(59, 130, 246, 0.16), transparent 78%);
 }
 
 #app #login-box .x4.cloud {
-	background: radial-gradient(closest-side, rgba(255, 138, 196, 0.38), transparent 72%);
+	top: 56%;
+	left: 48%;
+	background: radial-gradient(closest-side, rgba(150, 120, 250, 0.14), transparent 78%);
 }
 
 #app #login-box .x5.cloud {
-	background: radial-gradient(closest-side, rgba(255, 255, 255, 0.50), transparent 72%);
+	top: 20%;
+	left: 66%;
+	background: radial-gradient(closest-side, rgba(255, 255, 255, 0.60), transparent 78%);
 }
 
 /* 注意：这里刻意不覆盖 background。
@@ -542,10 +572,6 @@ body .el-message {
 	transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
-#app .aside .el-menu-item:hover {
-	transform: translateX(2px);
-}
-
 /* 主题切换的径向动画保持原有节奏，这里只让它更顺滑 */
 ::view-transition-old(root),
 ::view-transition-new(root) {
@@ -569,10 +595,120 @@ body .el-message {
 	}
 }
 
-/* 尊重系统的「减少动态效果」 */
+/* ---------------------------------------------------------------------------
+   9. 3D 动效
+   ---------------------------------------------------------------------------
+   --pointer-x / --pointer-y 由 utils/pointer-3d.js 写入（范围 -1~1，屏幕中心为 0），
+   全站只有一个指针监听。这里只做 transform，全部走 GPU 合成，不触发重排。
+
+   强度刻意保守：这是数据密集的邮件客户端，3D 是给「精致感」加分的，
+   不该抢内容的注意力，也不该让滚动掉帧。真正"给足"的只有登录页那张卡 ——
+   它是门面，而且页面元素少、没有性能负担。 */
+
+/* 9.1 背景光晕的景深：鼠标往哪移，光晕反方向挪一点，画面立刻有了前后层 */
+html::before {
+	transform: translate3d(
+		calc(var(--pointer-x, 0) * -18px),
+		calc(var(--pointer-y, 0) * -12px),
+		0
+	);
+	transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 9.2 登录卡 3D 倾斜：跟着鼠标转，移开自动回正 */
+#login-box .container {
+	transform:
+		perspective(1300px)
+		rotateY(calc(var(--pointer-x, 0) * -6deg))
+		rotateX(calc(var(--pointer-y, 0) * 5deg));
+	transform-style: preserve-3d;
+	transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 9.3 邮件行：悬停抬离平面。
+   刻意不设 position/z-index —— 行在虚拟列表里，任何影响层叠或定位的改动
+   都可能波及高度测量与点击命中，只用 transform + 阴影最安全。 */
+#app .email-row {
+	transition:
+		background-color 0.15s ease,
+		transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+		box-shadow 0.22s ease;
+}
+
+#app .email-row:hover {
+	transform: translate3d(0, -2px, 0) scale(1.006);
+	box-shadow: 0 6px 18px rgba(15, 23, 42, 0.10);
+}
+
+/* 9.4 账户卡片：同一套"抬升"语言，保证全站动效一致 */
+#app .account-box {
+	perspective: 1000px;
+}
+
+#app .account-box .item {
+	transition:
+		transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+		box-shadow 0.25s ease,
+		background-color 0.2s ease;
+}
+
+#app .account-box .item:hover {
+	transform: translate3d(0, -2px, 8px) scale(1.015);
+	box-shadow: 0 10px 26px rgba(15, 23, 42, 0.14);
+}
+
+/* 9.5 侧栏菜单：轻微向观察者翻起 */
+#app .aside .el-menu {
+	perspective: 900px;
+}
+
+#app .aside .el-menu-item:hover {
+	transform: translate3d(3px, 0, 10px) rotateY(-4deg);
+}
+
+/* 9.6 对话框 3D 入场：从屏幕深处立起来。
+   选择器用 [class*="enter-active"] 而不是写死 dialog-fade-enter-active ——
+   Element Plus 各版本的过渡类名不统一，属性匹配不会被版本升级搞失效；
+   而 (0,2,1) 的优先级也压得过 EP 自己的 .dialog-fade-enter-active .el-dialog。 */
+@keyframes glass-dialog-in {
+	from {
+		opacity: 0;
+		transform: perspective(1200px) translate3d(0, 24px, -120px) rotateX(8deg) scale(0.97);
+	}
+	to {
+		opacity: 1;
+		transform: perspective(1200px) translate3d(0, 0, 0) rotateX(0deg) scale(1);
+	}
+}
+
+body .el-overlay-dialog .el-dialog {
+	transform-style: preserve-3d;
+}
+
+body .el-overlay[class*="enter-active"] .el-dialog,
+body .el-overlay[class*="enter-active"] .el-message-box,
+body .el-overlay[class*="enter-active"] .el-drawer {
+	animation: glass-dialog-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 尊重系统的「减少动态效果」：关掉全部 3D 与位移，只留必要的可见性变化 */
 @media (prefers-reduced-motion: reduce) {
 	#app .aside .el-menu-item:hover,
-	#app .el-button--primary:hover {
+	#app .el-button--primary:hover,
+	#app .email-row:hover,
+	#app .account-box .item:hover {
 		transform: none;
+	}
+
+	html::before,
+	#login-box .container {
+		transform: none;
+		transition: none;
+	}
+
+	body .el-overlay[class*="enter-active"] .el-dialog,
+	body .el-overlay[class*="enter-active"] .el-message-box,
+	body .el-overlay[class*="enter-active"] .el-drawer {
+		animation: none;
 	}
 }

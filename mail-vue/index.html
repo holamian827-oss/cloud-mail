@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta name="theme-color" content="#EEF2F8" id="theme-color-meta">
+  <meta name="theme-color" content="#F1F3FA" id="theme-color-meta">
   <meta name="description" content="Cloud Mail">
   <title>Cloud Mail</title>
   <link rel="icon" href="/mail.png" type="image/png">
@@ -19,38 +19,42 @@
     }
     const metaTag = document.getElementById('theme-color-meta');
     const isMobile =  !window.matchMedia("(pointer: fine) and (hover: hover)").matches;
-    metaTag.setAttribute('content', isDark ? (isMobile ? '#0A0C12' : '#000000') : (isMobile ? '#191A23' : '#EEF2F8'));
+    metaTag.setAttribute('content', isDark ? (isMobile ? '#0B0D14' : '#000000') : (isMobile ? '#191A23' : '#F1F3FA'));
   </script>
   <style>
     /* 首屏关键样式：在应用 bundle 加载前就要生效，所以不能依赖 glass.css。
        下面的底色与色晕刻意和 glass.css 的 --glass-page-base / --glass-mesh 保持一致，
        否则应用挂载后背景会「跳」一下。改 glass.css 的调色板时记得同步这里。 */
     html {
-      background: #EEF2F8;
+      background: #F1F3FA;
     }
     html.dark {
-      background: #0A0C12;
+      background: #0B0D14;
     }
     html::before {
       content: "";
       position: fixed;
-      inset: 0;
+      /* 往外多留一圈：3D 视差会让这层随鼠标平移最多 18px，
+         inset 正好等于 0 时会在反方向露出没画光晕的空白边。 */
+      inset: -24px;
       z-index: -1;
       pointer-events: none;
       background-repeat: no-repeat;
       background-size: cover;
+      /* 只保留「蓝→靛蓝→紫」这一个相邻色系（色相跨度约 40°）。
+         之前用了蓝/紫/青/粉四个色相、跨度约 140°，那是四个色系硬凑，
+         所以显得杂、不搭。相邻色系才读得出「协调」。
+         三个光晕之间靠明度和大小拉开层次，而不是靠加新色相。 */
       background-image:
-        radial-gradient(1100px 700px at 12% -10%, rgba(24, 144, 255, 0.30), transparent 60%),
-        radial-gradient(900px 620px at 94% 2%, rgba(124, 92, 255, 0.26), transparent 58%),
-        radial-gradient(820px 700px at 80% 98%, rgba(34, 211, 238, 0.22), transparent 60%),
-        radial-gradient(720px 560px at 20% 90%, rgba(255, 138, 196, 0.18), transparent 62%);
+        radial-gradient(1100px 720px at 10% -12%, rgba(76, 110, 245, 0.30), transparent 62%),
+        radial-gradient(900px 640px at 96% 0%, rgba(121, 80, 242, 0.24), transparent 60%),
+        radial-gradient(820px 700px at 78% 100%, rgba(59, 130, 246, 0.20), transparent 62%);
     }
     html.dark::before {
       background-image:
-        radial-gradient(1100px 700px at 12% -10%, rgba(24, 144, 255, 0.20), transparent 60%),
-        radial-gradient(900px 620px at 94% 2%, rgba(124, 92, 255, 0.18), transparent 58%),
-        radial-gradient(820px 700px at 80% 98%, rgba(34, 211, 238, 0.13), transparent 60%),
-        radial-gradient(720px 560px at 20% 90%, rgba(255, 138, 196, 0.10), transparent 62%);
+        radial-gradient(1100px 720px at 10% -12%, rgba(76, 110, 245, 0.22), transparent 62%),
+        radial-gradient(900px 640px at 96% 0%, rgba(121, 80, 242, 0.18), transparent 60%),
+        radial-gradient(820px 700px at 78% 100%, rgba(59, 130, 246, 0.14), transparent 62%);
     }
 
     #loading-first {

@@ -106,12 +106,17 @@ button, input, select, textarea {
 }
 
 :root {
-    --el-color-primary: #1890ff;
-    --el-color-primary-dark-2: #1064c0;
-    --el-color-primary-light-3: #4dabff;
-    --el-color-primary-light-5: #69c0ff;
-    --el-color-primary-light-7: #91d5ff;
-    --el-color-primary-light-9: #e6f7ff;
+    /* 主色从偏青的 #1890ff 换成靛蓝。
+       原因：整套磨砂玻璃的底色光晕是「靛蓝→紫」的相邻色系，
+       原来的亮青蓝和紫色晕叠在一起互相打架，显得杂。
+       整条色阶取自 Open Color 的 indigo 梯度，保证同色系、明度均匀递进。
+       要换回原来的蓝、或换任何别的颜色，只改这 6 行即可，全局跟着变。 */
+    --el-color-primary: #4C6EF5;
+    --el-color-primary-dark-2: #4263EB;
+    --el-color-primary-light-3: #748FFC;
+    --el-color-primary-light-5: #91A7FF;
+    --el-color-primary-light-7: #BAC8FF;
+    --el-color-primary-light-9: #EDF2FF;
 
     --extra-light-fill: #FAFCFF;
     --settings-page-background: #fafbfc;
@@ -133,7 +138,7 @@ button, input, select, textarea {
     --email-right-click-background: #FDF6EC;
     --login-border: none;
     --form-desc-color: #71717a;
-    --login-switch-color: #006be6;
+    --login-switch-color: var(--el-color-primary);
     --scrollbar-track-color: #A8ABB2;
     --base-border-color: #DCDFE6;
     --secondary-text-color: #909399;
