@@ -3,23 +3,25 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>【服务名】 - 自建域名邮箱服务</title>
-<meta name="description" content="【服务名】提供基于自有域名的邮箱服务：支持多域名、多账号、邮件收发、附件与内嵌图片、邮件转发与验证码识别。现在即可注册使用。"/>
+<title>Aurax Mail - @aurax.eu.org 域名邮箱服务</title>
+<meta name="description" content="Aurax Mail 提供 @aurax.eu.org 的域名邮箱：可创建任意前缀的邮箱地址，支持多账号、邮件收发、附件与内嵌图片、邮件转发与验证码识别。注册即可使用。"/>
 <meta name="robots" content="index, follow"/>
 <meta name="theme-color" content="#F1F3FA"/>
 <meta property="og:type" content="website"/>
-<meta property="og:title" content="【服务名】 - 自建域名邮箱服务"/>
-<meta property="og:description" content="支持自有域名、多账号、附件收发的邮箱服务，注册即可使用。"/>
+<meta property="og:title" content="Aurax Mail - @aurax.eu.org 域名邮箱服务"/>
+<meta property="og:description" content="用 @aurax.eu.org 创建你自己的邮箱地址，支持多账号、附件收发、邮件转发与验证码识别。"/>
 <link rel="icon" href="/mail.png" type="image/png"/>
 
 <!--
   ============================================================================
-  ⚙️ 需要你改的地方（全文搜索【】即可定位）
-     【服务名】     —— 你想对外显示的名字
-     【支持的域名】 —— 例如 example.com / mail.example.com
-     【你的联系方式】—— 例如 admin@example.com
-  改完直接访问 /about 预览（部署后 worker 会把 /about 重写到这个文件；
-  本地 vite dev 没有这层重写，用 /about.html 预览即可），无需重新构建。
+  当前内容已按站点实际配置填好：站名 Aurax Mail、域名 @aurax.eu.org、
+  联系方式 admin@aurax.eu.org。
+  要改站名/域名/联系方式，全文搜索下面的字样替换即可。
+  改完无需重新构建，但**要重新部署**才会生效。
+
+  关于访问地址：/about 能打开是因为 Cloudflare 静态资源的默认行为
+  （不带扩展名的请求会返回同名的 .html 文件），不是 worker 里写的重写规则 ——
+  这一点很关键，之前正是因为在 worker 里手写了一遍同样的逻辑，才造成了无限重定向。
   ============================================================================
 
   为什么这个页面是「裸 HTML」而不是 Vue 页面：
@@ -105,14 +107,14 @@
 <div class="wrap">
 
   <div class="brand">
-    <img src="/mail.png" alt="【服务名】"/>
-    <span>【服务名】</span>
+    <img src="/mail.png" alt="Aurax Mail"/>
+    <span>Aurax Mail</span>
   </div>
 
-  <h1>用自己的域名，<em>收一封正经的邮件</em></h1>
+  <h1>用 <em>@aurax.eu.org</em>，收一封正经的邮件</h1>
 
   <p class="lead">
-    【服务名】是一个基于自有域名的邮箱服务。你可以用【支持的域名】下的任意前缀创建邮箱地址，
+    Aurax Mail 是一个基于自有域名的邮箱服务。你可以用 @aurax.eu.org 下的任意前缀创建邮箱地址，
     收发邮件、带附件、看内嵌图片，全部在浏览器里完成，无需安装任何客户端。
   </p>
 
@@ -139,7 +141,7 @@
     <h2>支持的邮箱域名</h2>
     <div class="card">
       <div class="domains">
-        <span class="domain">@【支持的域名】</span>
+        <span class="domain">@aurax.eu.org</span>
       </div>
     </div>
   </section>
@@ -149,7 +151,6 @@
     <div class="card">
       <ul>
         <li>打开登录页，注册一个邮箱地址</li>
-        <li>如果站点需要邀请码，请向管理员索取</li>
         <li>登录后即可收发邮件、添加更多邮箱地址</li>
       </ul>
       <div class="cta">
@@ -160,7 +161,7 @@
 
   <footer>
     <p>
-      【服务名】 · 管理员联系方式：【你的联系方式】
+      Aurax Mail · 管理员联系方式：<a href="mailto:admin@aurax.eu.org">admin@aurax.eu.org</a>
     </p>
   </footer>
 
