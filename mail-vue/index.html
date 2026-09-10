@@ -1,11 +1,24 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <meta name="theme-color" content="#F1F3FA" id="theme-color-meta">
-  <meta name="description" content="Cloud Mail">
+  <meta name="description" content="Cloud Mail — 基于自有域名的邮箱服务">
   <title>Cloud Mail</title>
+
+  <!--
+    邮件应用本体不参与收录。
+    这里只是登录后的功能界面，没有任何有搜索价值的内容；更实际的是，
+    放它进搜索引擎等于把「注册入口」直接交给全网爬虫 —— 那正是垃圾注册的来源。
+    对外可收录的说明页是 /about.html（它自己有 index,follow）。
+
+    注意这里是 noindex 而不是 nofollow：保留 follow，让搜索引擎还能顺着
+    页面里的链接发现介绍页。另外这一条也顺带消掉了「软 404」问题 ——
+    应用配的是 SPA 回退，任意不存在的路径都会返回 200，这正是搜索引擎的扣分项；
+    加上 noindex 后这些空壳页面不会再被当成正常页面收录。
+  -->
+  <meta name="robots" content="noindex, follow"/>
   <link rel="icon" href="/mail.png" type="image/png">
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <script>
