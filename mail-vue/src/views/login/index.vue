@@ -108,6 +108,13 @@
           <div class="switch" @click="show = 'login'" v-else>{{ $t('hasAccount') }} <span>{{ $t('loginSwitch') }}</span>
           </div>
         </template>
+        <!-- 指向可收录的介绍页。
+             刻意用原生 <a href> 而不是 router-link：这是要交给搜索引擎爬取的页面，
+             原生链接爬虫才能顺着走。（应用本体设的是 noindex, follow —— 保留 follow
+             就是为了让这条链接能被跟进。） -->
+        <div class="about-entry">
+          <a href="/about">{{ $t('aboutSite') }}</a>
+        </div>
       </div>
     </div>
     <el-dialog class="bind-dialog" v-model="showBindForm"  title="注册邮箱" >
@@ -702,6 +709,24 @@ function submitRegister() {
     span {
       color: var(--login-switch-color);
       cursor: pointer;
+    }
+  }
+
+  /* 介绍页入口：做成低调的次要链接 ——
+     它不是登录流程的一部分，不该和「注册 / 登录」抢注意力。 */
+  .about-entry {
+    margin-top: 22px;
+    text-align: center;
+    font-size: 13px;
+
+    a {
+      color: var(--form-desc-color);
+      text-decoration: none;
+      transition: color 0.2s ease;
+
+      &:hover {
+        color: var(--el-color-primary);
+      }
     }
   }
 

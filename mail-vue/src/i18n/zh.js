@@ -123,6 +123,7 @@ const zh = {
     saving: '接收中',
     attachments: '附件列表',
     attCount: '共 {total} 个',
+    aboutSite: '了解这个邮箱服务',
     attLimit: '附件不能超过 10 个',
     attTooLarge: '单个附件不能超过 {msg}MB',
     attTotalTooLarge: '附件总大小不能超过 {msg}MB',
