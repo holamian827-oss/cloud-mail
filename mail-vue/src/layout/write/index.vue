@@ -265,6 +265,13 @@ function delAtt(index) {
   form.attachments.splice(index, 1);
 }
 
+// 与后端 email-service 的 SEND_LIMIT 保持一致的前端预检。
+// 后端会兜底拒绝，但附件是以 base64 塞进请求体的（体积膨胀约 1/3），
+// 传完再失败既慢又费流量，所以这里先拦一道。
+const MAX_ATTACHMENT_COUNT = 10
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024
+const MAX_ATTACHMENT_TOTAL = 25 * 1024 * 1024
+
 function chooseFile() {
   const doc = document.createElement("input")
   doc.setAttribute("type", "file")
@@ -273,15 +280,32 @@ function chooseFile() {
   doc.onchange = async (e) => {
 
     const fileList = e.target.files;
+    let totalSize = form.attachments.reduce((sum, item) => sum + (item.size || 0), 0)
 
     for (const file of fileList) {
+
+      if (form.attachments.length >= MAX_ATTACHMENT_COUNT) {
+        ElMessage({message: t('attLimit'), type: 'error', plain: true})
+        break
+      }
 
       const size = file.size
       const filename = file.name
       const contentType = file.type
 
+      if (size > MAX_ATTACHMENT_SIZE) {
+        ElMessage({message: t('attTooLarge', {msg: MAX_ATTACHMENT_SIZE / 1024 / 1024}), type: 'error', plain: true})
+        continue
+      }
+
+      if (totalSize + size > MAX_ATTACHMENT_TOTAL) {
+        ElMessage({message: t('attTotalTooLarge', {msg: MAX_ATTACHMENT_TOTAL / 1024 / 1024}), type: 'error', plain: true})
+        break
+      }
+
       const content = await fileToBase64(file)
       form.attachments.push({content, filename, size, contentType})
+      totalSize += size
 
     }
 

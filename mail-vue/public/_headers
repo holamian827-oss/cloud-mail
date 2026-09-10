@@ -1,3 +1,22 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
+  Permissions-Policy: geolocation=(), microphone=(), camera=()
+
+  # 只启用"不可能打断应用"的那几条 CSP 指令。
+  # 为什么不加 script-src / style-src：
+  #   index.html 有内联启动脚本、TinyMCE 需要 unsafe-eval，真要用就得给
+  #   'unsafe-inline' 'unsafe-eval' —— 那等于把 script-src 的保护价值掏空，
+  #   却仍然有打断编辑器的风险。得不偿失。
+  # 为什么不用 Report-Only 观察：
+  #   没有 report-to/report-uri 采集端时，违规只出现在访问者自己的控制台，
+  #   不留任何记录，等于零收益 —— 而且会制造"已经上了 CSP"的错觉。
+  # 留下的这三条不碰脚本和样式，所以不会破坏任何页面，防护是实打实的：
+  #   object-src 'none'    —— 禁掉 <object>/<embed> 这条老注入面
+  #   base-uri 'self'      —— 禁掉注入 <base> 劫持相对路径
+  #   frame-ancestors 'self' —— 防点击劫持（X-Frame-Options 的现代替代，两者并存兼容老浏览器）
+  Content-Security-Policy: object-src 'none'; base-uri 'self'; frame-ancestors 'self'
 /assets/*
   Cache-Control: public, max-age=31556952, immutable
 /tinymce/*

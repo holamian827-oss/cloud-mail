@@ -1,6 +1,7 @@
 import BizError from '../error/biz-error';
 import verifyUtils from '../utils/verify-utils';
 import emailUtils from '../utils/email-utils';
+import domainUtils from '../utils/domain-uitls';
 import userService from './user-service';
 import emailService from './email-service';
 import orm from '../entity/orm';
@@ -35,7 +36,7 @@ const accountService = {
 			throw new BizError(t('notEmail'));
 		}
 
-		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
+		if (!domainUtils.isAllowedEmailDomain(c, email)) {
 			throw new BizError(t('notExistDomain'));
 		}
 

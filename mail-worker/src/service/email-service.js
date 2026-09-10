@@ -16,6 +16,33 @@ import userService from './user-service';
 import roleService from './role-service';
 import user from '../entity/user';
 import starService from './star-service';
+
+// 发信相关的资源上限。取值依据：
+//  - 单个附件 10MB / 合计 25MB：再大时 Worker（128MB 内存上限）在解析 base64 副本时
+//    容易 OOM，而且发信服务本身也有体积上限；
+//  - 收件人 50：防止一次请求扇出成大量外部调用，打满 Worker 的子请求配额
+//    （免费版每请求只有 50 次子请求，还要留余量给 D1/KV）；
+//  - 正文 1MB：正常邮件远达不到，但可以挡住用超长正文撑内存的玩法。
+const SEND_LIMIT = {
+	ATTACHMENT_COUNT: 10,
+	ATTACHMENT_SIZE: 10 * 1024 * 1024,
+	ATTACHMENT_TOTAL: 25 * 1024 * 1024,
+	INLINE_IMAGE_COUNT: 10,
+	RECIPIENT_COUNT: 50,
+	CONTENT_LENGTH: 1024 * 1024
+};
+
+// 估算 base64 字符串解码后的字节数。刻意不真的解码 —— 那会再多占一份内存。
+function base64ByteSize(base64) {
+	if (typeof base64 !== 'string') {
+		return 0;
+	}
+
+	const pure = base64.split(',').pop();
+	const padding = pure.endsWith('==') ? 2 : pure.endsWith('=') ? 1 : 0;
+
+	return Math.max(0, Math.floor(pure.length * 3 / 4) - padding);
+}
 import dayjs from 'dayjs';
 import kvConst from '../const/kv-const';
 import { t } from '../i18n/i18n'
@@ -277,9 +304,56 @@ const emailService = {
 			attachments = [] //附件
 		} = params;
 
+		// ---- 资源限制 ----
+		// 必须放在**任何副作用之前**（发信、落库、上传）。
+		// 原来"附件数量"的校验写在邮件已经发出、数据已经落库之后 —— 用户看到报错，
+		// 但信其实已经发走了，附件没存上，发送次数也已经扣了。
+
+		// 参数默认值只覆盖 undefined，客户端传 null 时要单独兜住，
+		// 否则下面的 attachments.length 会抛 TypeError 变成 500。
+		if (!Array.isArray(attachments)) {
+			attachments = [];
+		}
+
+		if (!Array.isArray(receiveEmail) || receiveEmail.length === 0) {
+			throw new BizError(t('emptyReceiveEmail'));
+		}
+
+		if (receiveEmail.length > SEND_LIMIT.RECIPIENT_COUNT) {
+			throw new BizError(t('tooManyRecipient', { msg: SEND_LIMIT.RECIPIENT_COUNT }));
+		}
+
+		if (attachments.length > SEND_LIMIT.ATTACHMENT_COUNT) {
+			throw new BizError(t('attLimit'));
+		}
+
+		let attachmentTotalSize = 0;
+
+		for (const att of attachments) {
+			const size = base64ByteSize(att?.content);
+
+			if (size > SEND_LIMIT.ATTACHMENT_SIZE) {
+				throw new BizError(t('attTooLarge', { msg: SEND_LIMIT.ATTACHMENT_SIZE / 1024 / 1024 }));
+			}
+
+			attachmentTotalSize += size;
+		}
+
+		if (attachmentTotalSize > SEND_LIMIT.ATTACHMENT_TOTAL) {
+			throw new BizError(t('attTotalTooLarge', { msg: SEND_LIMIT.ATTACHMENT_TOTAL / 1024 / 1024 }));
+		}
+
+		if (typeof content === 'string' && content.length > SEND_LIMIT.CONTENT_LENGTH) {
+			throw new BizError(t('contentTooLarge'));
+		}
+
 		const { resendTokens, r2Domain, send, domainList } = await settingService.query(c);
 
 		let { imageDataList, html } = await attService.toImageUrlHtml(c, content);
+
+		if (imageDataList.length > SEND_LIMIT.INLINE_IMAGE_COUNT) {
+			throw new BizError(t('imageAttLimit'));
+		}
 
 		//判断是否关闭发件功能
 		if (send === settingConst.send.CLOSE) {
@@ -450,19 +524,13 @@ const emailService = {
 		//保存到数据库并返回结果
 		const emailResult = await orm(c).insert(email).values(emailData).returning().get();
 
-		//保存内嵌附件
+		//保存内嵌附件（数量上限已在函数开头统一校验，这里只管落库）
 		if (imageDataList.length > 0) {
-			if (imageDataList.length > 10) {
-				throw new BizError(t('imageAttLimit'));
-			}
 			await attService.saveArticleAtt(c, imageDataList, userId, accountId, emailResult.emailId);
 		}
 
-		//保存普通附件
+		//保存普通附件（同上）
 		if (attachments?.length > 0) {
-			if (attachments.length > 10) {
-				throw new BizError(t('attLimit'));
-			}
 			await attService.saveSendAtt(c, attachments, userId, accountId, emailResult.emailId);
 		}
 

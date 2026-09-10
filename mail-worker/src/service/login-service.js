@@ -1,6 +1,7 @@
 import BizError from '../error/biz-error';
 import userService from './user-service';
 import emailUtils from '../utils/email-utils';
+import domainUtils from '../utils/domain-uitls';
 import { isDel, settingConst, userConst } from '../const/entity-const';
 import JwtUtils from '../utils/jwt-utils';
 import { v4 as uuidv4 } from 'uuid';
@@ -21,6 +22,7 @@ import { t } from '../i18n/i18n.js';
 import verifyRecordService from './verify-record-service';
 import limitUtils from '../utils/limit-utils';
 import reqUtils from '../utils/req-utils';
+import securityLog from '../utils/security-log';
 
 const loginService = {
 
@@ -31,13 +33,28 @@ const loginService = {
 		let { regKey, register, registerVerify, regVerifyCount, minEmailPrefix, emailPrefixFilter } = await settingService.query(c)
 
 		if (oauth) {
+			// 第三方平台已经验证过这个人，所以跳过人机验证是合理的。
 			registerVerify = settingConst.registerVerify.CLOSE;
-			register = settingConst.register.OPEN;
+
+			// 但**不能**顺手把 register 强制成 OPEN —— 那等于"关闭注册"这个开关
+			// 对 OAuth 首登完全失效，任何人拿几个第三方小号就能无限建号。
+			// 注册开关是管理员的决定，OAuth 也必须遵守。
 		}
 
 		if (register === settingConst.register.CLOSE) {
 			throw new BizError(t('regDisabled'));
 		}
+
+		// 建号频次限制：**只统计成功建号**，不统计尝试。
+		// 原来 /register 没有任何频次限制，默认配置下（不要注册码、不要验证码）
+		// 一个脚本就能无限刷号。OAuth 建号同样走这里，所以一并受控。
+		//
+		// 为什么不在这里计数：这个函数前面还有一大堆校验（密码长度、邮箱占用、
+		// 人机验证、注册码、域名白名单），任何一条失败都会提前 throw。若把
+		// "每次调用"都算成一次，家庭/办公室/NAT 共用出口时，几次表单填错就会把
+		// 后面正常的人挡在门外。要限制的是"建号速率"，不是"尝试次数"。
+		const registerIp = reqUtils.getIp(c);
+		await limitUtils.assertNotLocked(c, 'register:ip', registerIp);
 
 		if (!verifyUtils.isEmail(email)) {
 			throw new BizError(t('notEmail'));
@@ -63,7 +80,7 @@ const loginService = {
 			throw new BizError(t('pwdMinLength'));
 		}
 
-		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
+		if (!domainUtils.isAllowedEmailDomain(c, email)) {
 			throw new BizError(t('notEmailDomain'));
 		}
 
@@ -135,6 +152,16 @@ const loginService = {
 		await accountService.insert(c, { userId: userId, email, name: emailUtils.getName(email) });
 
 		await userService.updateUserInfo(c, userId, true);
+
+		// 建号成功才计数，与上面的 assertNotLocked 配成一对固定窗口限速
+		await limitUtils.recordFail(c, 'register:ip', registerIp);
+
+		securityLog.write('user_registered', {
+			email,
+			userId,
+			ip: registerIp,
+			oauth: !!oauth
+		});
 
 		if (regKey !== settingConst.regKey.CLOSE && type) {
 			await regKeyService.reduceCount(c, code, 1);
@@ -247,6 +274,10 @@ const loginService = {
 			if (!noVerifyPwd) {
 				await limitUtils.recordFail(c, 'login:email', limitEmail);
 				await limitUtils.recordFail(c, 'login:ip', ip);
+				// 失败原因只记 code，不记 message —— message 会区分「用户不存在」和
+				// 「密码错误」，而这两个恰恰是账号枚举要的信息。日志给管理员看，
+				// 但也别让日志本身成为一份枚举字典。
+				securityLog.write('login_failed', { email: limitEmail, ip, code: e?.code });
 			}
 
 			throw e;
@@ -255,6 +286,7 @@ const loginService = {
 		if (!noVerifyPwd) {
 			await limitUtils.clear(c, 'login:email', limitEmail);
 			await limitUtils.clear(c, 'login:ip', ip);
+			securityLog.write('login_success', { email: userRow.email, ip, userId: userRow.userId });
 			// 旧版SHA-256哈希校验通过后惰性升级为PBKDF2
 			await this.upgradePasswordIfLegacy(c, userRow, password);
 		}

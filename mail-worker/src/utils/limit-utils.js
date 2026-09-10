@@ -1,5 +1,6 @@
 import BizError from '../error/biz-error';
 import { t } from '../i18n/i18n';
+import securityLog from './security-log';
 
 // 基于 KV 的失败计数 + 锁定,用于认证类接口的暴力破解防护
 // 说明:同一窗口内失败达到 MAX_FAIL 次即锁定 LIMIT_WINDOW 秒,计数键通过 expirationTtl 自动过期
@@ -21,6 +22,9 @@ const limitUtils = {
 	async assertNotLocked(c, scope, id) {
 		const count = Number(await c.env.kv.get(this.key(scope, id))) || 0;
 		if (count >= MAX_FAIL) {
+			// 触发锁定是安全事件，要留痕：它同时意味着「有人在被暴力破解」
+			// 和「可能有正常用户被误锁」，两种都需要管理员能看到。
+			securityLog.write('rate_limit_blocked', { scope, target: id, count });
 			throw new BizError(t('tooManyAttempts'), 429);
 		}
 	},

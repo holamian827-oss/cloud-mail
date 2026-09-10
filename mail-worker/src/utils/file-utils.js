@@ -42,6 +42,29 @@ const fileUtils = {
 		return hashArray.slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('');
 	},
 
+	/**
+	 * 生成不可推导的对象名（16 字节随机数 → 32 位十六进制）。
+	 *
+	 * 用途约定：**存放用户产生的私有对象（附件、内嵌图片）时用它，
+	 * 不要用 getBuffHash。**
+	 *
+	 * 原因：内容哈希是"可推导的能力 URL"——对象名由文件内容唯一决定，
+	 * 因此任何知道该文件内容的人都能算出地址。这不会泄露他本来没有的东西，
+	 * 但会形成一个**存在性探针**：拿一个已知文件的哈希去探某个实例是否存过它。
+	 * http 路径 (/attachments/*、/oss/*) 是匿名可读的（浏览器 <img> 带不了鉴权头），
+	 * 所以这个探针是真实可用的。
+	 *
+	 * 代价：失去按内容去重，同一个文件被多次上传会各存一份。
+	 *
+	 * 例外：站点背景图（BACKGROUND_PREFIX）刻意继续用内容哈希 —— 它本来就是
+	 * 对所有人公开的资源，随机化没有安全收益，反而丢掉去重。
+	 */
+	genObjectName() {
+		const bytes = new Uint8Array(16);
+		crypto.getRandomValues(bytes);
+		return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+	},
+
 	base64ToDataStr(base64) {
 		return base64.split(',')[1] || base64;
 	},

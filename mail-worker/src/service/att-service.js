@@ -9,6 +9,11 @@ import { parseHTML } from 'linkedom';
 import { v4 as uuidv4 } from 'uuid';
 import domainUtils from '../utils/domain-uitls';
 import settingService from "./setting-service";
+import BizError from '../error/biz-error';
+import { t } from '../i18n/i18n';
+
+// 正文内嵌图片的数量上限，与 email-service 的 SEND_LIMIT.INLINE_IMAGE_COUNT 一致
+const INLINE_IMAGE_MAX = 10;
 
 const attService = {
 
@@ -73,13 +78,23 @@ const attService = {
 
 		for (const img of images) {
 
+			// 数量上限必须在**本轮抓取之前**判断。
+			// 原来是在调用方等整个 toImageUrlHtml 跑完才数数量，而每一张站内图都要
+			// 去 KV/R2 取一次对象并读进内存 —— 正文里塞几百个 <img> 就能在检查到来之前
+			// 先完成几百次子请求和全量缓冲，把内存和子请求配额打满。
+			// 注意判断的是 imageDataList（只统计真正要转成附件的图），
+			// 所以正文里有大量外链图片的正常邮件不会被误伤。
+			if (imageDataList.length >= INLINE_IMAGE_MAX) {
+				throw new BizError(t('imageAttLimit'));
+			}
+
 			//邮件正文base64图片转cid附件
 			const src = img.getAttribute('src');
 			if (src && src.startsWith('data:image')) {
 				const file = fileUtils.base64ToFile(src);
 				const buff = await file.arrayBuffer();
 				const cid = uuidv4().replace(/-/g, '');
-				const key = constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(buff) + fileUtils.getExtFileName(file.name);
+				const key = constant.ATTACHMENT_PREFIX + fileUtils.genObjectName() + fileUtils.getExtFileName(file.name);
 
 				img.setAttribute('src', 'cid:' + cid);
 
@@ -167,7 +182,7 @@ const attService = {
 
 		for (let att of attList) {
 			att.buff = fileUtils.base64ToUint8Array(att.content);
-			att.key = constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(att.buff) + fileUtils.getExtFileName(att.filename);
+			att.key = constant.ATTACHMENT_PREFIX + fileUtils.genObjectName() + fileUtils.getExtFileName(att.filename);
 			const attData = { userId, accountId, emailId };
 			attData.key = att.key;
 			attData.size = att.buff.length;

@@ -4,6 +4,7 @@ import orm from '../entity/orm';
 import user from '../entity/user';
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { emailConst, isDel, roleConst, settingConst, userConst } from '../const/entity-const';
+import domainUtils from '../utils/domain-uitls';
 import kvConst from '../const/kv-const';
 import KvConst from '../const/kv-const';
 import cryptoUtils from '../utils/crypto-utils';
@@ -19,6 +20,8 @@ import reqUtils from '../utils/req-utils';
 import {oauth} from "../entity/oauth";
 import oauthService from "./oauth-service";
 import settingService from './setting-service';
+import userContext from '../security/user-context';
+import securityLog from '../utils/security-log';
 import starService from './star-service';
 
 const userService = {
@@ -309,11 +312,19 @@ const userService = {
 			throw new BizError(t('roleNotExist'));
 		}
 
+		await this.assertCanAssignRole(c, type);
+
 		await orm(c)
 			.update(user)
 			.set({ type })
 			.where(eq(user.userId, userId))
 			.run();
+
+		securityLog.write('user_role_changed', {
+			targetUserId: userId,
+			roleId: type,
+			operator: userContext.getUser(c)?.email
+		});
 
 	},
 
@@ -333,11 +344,22 @@ const userService = {
 			.run();
 	},
 
+	/**
+	 * 提权防护：委托给 roleService 统一实现。
+	 *
+	 * 之所以收口到 role-service：/user/add、/user/setType、/role/set（往角色里灌权限）、
+	 * /regKey/add（签一张指定角色的注册码）是同一类操作 —— 都会把角色或权限发出去。
+	 * 四条路必须共用同一套口径，否则挡了这条、漏了那条，等于没挡。
+	 */
+	assertCanAssignRole(c, roleId) {
+		return roleService.assertCanAssignRole(c, roleId);
+	},
+
 	async add(c, params) {
 
 		let { email, type, password } = params;
 
-		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
+		if (!domainUtils.isAllowedEmailDomain(c, email)) {
 			throw new BizError(t('notEmailDomain'));
 		}
 
@@ -367,6 +389,8 @@ const userService = {
 			throw new BizError(t('roleNotExist'));
 		}
 
+		await this.assertCanAssignRole(c, type);
+
 		const { salt, hash } = await saltHashUtils.hashPassword(password);
 
 		const userId = await userService.insert(c, { email, password: hash, salt, type });
@@ -374,6 +398,13 @@ const userService = {
 		await userService.updateUserInfo(c, userId, true);
 
 		await accountService.insert(c, { userId: userId, email, type, name: emailUtils.getName(email) });
+
+		securityLog.write('user_created_by_admin', {
+			email,
+			userId,
+			roleId: type,
+			operator: userContext.getUser(c)?.email
+		});
 	},
 
 	async resetDaySendCount(c) {

@@ -36,6 +36,11 @@ const regKeyService = {
 			throw new BizError(t('roleNotExist'));
 		}
 
+		// 提权防护：注册码会把「指定角色」直接发给用它注册出来的账号，
+		// 所以签注册码等价于发放角色 —— 必须和 /user/add、/role/set 同一套口径，
+		// 否则持 reg-key:add 的人可以给最高权限角色签码，再注册进该角色。
+		await roleService.assertCanAssignRole(c, roleId);
+
 		expireTime = formatDetailDate(expireTime)
 
 		await orm(c).insert(regKey).values({code,roleId,count,userId,expireTime}).run();

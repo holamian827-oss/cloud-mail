@@ -31,6 +31,19 @@ const permService = {
 			.where(and(eq(user.userId,userId),eq(perm.type,permConst.type.BUTTON)))
 			.all();
 		return userPerms.map(perm => perm.permKey);
+	},
+
+	/**
+	 * 某个角色拥有的权限点。
+	 * 用途：判断"把某个角色授予他人"是否超出操作者自身的权限（提权防护）。
+	 */
+	async rolePermKeys(c, roleId) {
+		const rows = await orm(c).select({permKey: perm.permKey}).from(rolePerm)
+			.leftJoin(perm, eq(perm.permId, rolePerm.permId))
+			.where(eq(rolePerm.roleId, roleId))
+			.all();
+
+		return rows.map(row => row.permKey).filter(Boolean);
 	}
 }
 

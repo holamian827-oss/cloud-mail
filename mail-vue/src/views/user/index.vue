@@ -93,9 +93,9 @@
           </el-table-column>
           <el-table-column :label="$t('tabSetting')" :width="settingWidth">
             <template #default="props">
-              <el-button size="small" type="primary" v-if="(props.row.type === 0 && userStore.user.type !== 0)" >{{ $t('action') }}</el-button>
+              <el-button size="small" text type="primary" v-if="(props.row.type === 0 && userStore.user.type !== 0)" >{{ $t('action') }}</el-button>
               <el-dropdown v-else >
-                <el-button size="small" type="primary">{{ $t('action') }}</el-button>
+                <el-button size="small" text type="primary">{{ $t('action') }}</el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
                     <el-dropdown-item @click="openSetPwd(props.row)" >{{ $t('chgPwd') }}</el-dropdown-item>
@@ -215,7 +215,7 @@
         <el-table-column :label="t('action')" :width="locale === 'en' ? 75 : 65" >
           <template #default="props">
             <el-dropdown trigger="click">
-              <el-button type="primary" size="small">{{t('action')}}</el-button>
+              <el-button type="primary" text size="small">{{t('action')}}</el-button>
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item @click="deleteAccount(props.row)">{{ $t('delete') }}</el-dropdown-item>

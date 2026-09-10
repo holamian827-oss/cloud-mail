@@ -9,6 +9,30 @@ import user from '../entity/user';
 import verifyUtils from '../utils/verify-utils';
 import { t } from '../i18n/i18n.js';
 import emailUtils from '../utils/email-utils';
+import permService from './perm-service';
+import userContext from '../security/user-context';
+
+// 「特权权限」清单：这些权限点让持有者能影响**其他用户**或**系统配置**。
+//
+// 提权防护只在这一组上做子集判断，**刻意不做全量权限比较** ——
+// 普通用户角色带着 email:send / account:delete 这类「使用型」权限，
+// 而管理型角色通常没有这些，全量比较会把「建一个普通用户」这种完全正常的
+// 操作也判成提权而挡掉。要挡的是「把管理能力授出去」，不是「把邮箱功能授出去」。
+const PRIVILEGE_PERM_KEYS = [
+	'user:add',
+	'user:set-type',
+	'user:set-status',
+	'user:set-pwd',
+	'user:delete',
+	'user:reset-send',
+	'role:add',
+	'role:set',
+	'role:delete',
+	'setting:set',
+	'reg-key:add',
+	'reg-key:delete',
+	'all-email:delete'
+];
 
 const roleService = {
 
@@ -61,6 +85,60 @@ const roleService = {
 		return roleList;
 	},
 
+	/**
+	 * 提权防护：操作者不能交出「自己没有的特权权限」。
+	 *
+	 * 为什么必须挡：/user/add、/user/setType、/role/set、/regKey/add 四条路都能
+	 * 把角色发出去或把权限灌进角色。只要把其中任意一个权限授给非超管角色，
+	 * 那个角色就能给自己套上更高的权限，一步提权。规则只有一句：
+	 * 不能授予自己没有的特权权限。
+	 */
+	async assertCanGrantKeys(c, permKeys) {
+
+		const operator = userContext.getUser(c);
+
+		// 超管不受限（security.js 判定超管用的也是 email === c.env.admin）
+		if (operator?.email === c.env.admin) {
+			return;
+		}
+
+		const targetPrivileges = (permKeys || []).filter(key => PRIVILEGE_PERM_KEYS.includes(key));
+
+		if (targetPrivileges.length === 0) {
+			return;
+		}
+
+		const mine = await permService.userPermKeys(c, operator?.userId);
+
+		// 通配表示不受限（loginUserInfo 会给超管邮箱发 '*'）
+		if (mine.includes('*')) {
+			return;
+		}
+
+		if (targetPrivileges.some(key => !mine.includes(key))) {
+			throw new BizError(t('cannotGrantHigherRole'), 403);
+		}
+	},
+
+	/** 按目标角色的权限做一次提权检查（用于 addUser / setType / 签发注册码） */
+	async assertCanAssignRole(c, roleId) {
+		const target = await permService.rolePermKeys(c, roleId);
+		await this.assertCanGrantKeys(c, target);
+	},
+
+	/** permId 列表 → permKey 列表 */
+	async selectPermKeysByIds(c, permIds) {
+
+		if (!permIds?.length) {
+			return [];
+		}
+
+		const rows = await orm(c).select({ permKey: perm.permKey }).from(perm)
+			.where(inArray(perm.permId, permIds)).all();
+
+		return rows.map(row => row.permKey).filter(Boolean);
+	},
+
 	async setRole(c, params) {
 
 		let { name, permIds, roleId, banEmail, availDomain } = params;
@@ -80,6 +158,11 @@ const roleService = {
 		banEmail = banEmail.join(',')
 
 		availDomain = availDomain.join(',')
+
+		// 提权防护：只能往角色里灌「自己已经持有」的特权权限。
+		// 原来这里是无条件 DELETE role_perm 再按传入的 permIds 重插，没有任何校验 ——
+		// 持 role:set 的人可以给自己的角色塞进 setting:set、user:add 等任意权限点，一步提权。
+		await this.assertCanGrantKeys(c, await this.selectPermKeysByIds(c, permIds));
 
 		await orm(c).update(role).set({...params, banEmail, availDomain}).where(eq(role.roleId, roleId)).run();
 		await orm(c).delete(rolePerm).where(eq(rolePerm.roleId, roleId)).run();

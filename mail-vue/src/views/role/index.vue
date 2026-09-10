@@ -34,7 +34,7 @@
         <el-table-column :label="$t('tabSetting')" :width="settingWidth">
           <template #default="props">
             <el-dropdown trigger="click">
-              <el-button size="small" type="primary">{{ $t('action') }}</el-button>
+              <el-button size="small" text type="primary">{{ $t('action') }}</el-button>
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item @click="openRoleSet(props.row)">{{ $t('change') }}</el-dropdown-item>
