@@ -30,6 +30,18 @@ export default {
 			);
 		}
 
+		// 顺手接住不带扩展名的 /sitemap。
+		// 少了 .xml 时会落到静态资源的 SPA 回退，加载到邮件应用本体，
+		// 再由应用内的路由渲染出它自己的 404 页 —— 看起来就像"sitemap 打不开"，
+		// 实际是访问到了完全另一个东西。这个跳转能省掉这个误判。
+		//
+		// 安全性：跳转目标由下面紧邻的分支**直接返回**，不会再回到静态资源层，
+		// 因此不可能形成重定向循环（这正是之前 /about 那次踩的坑）。
+		if (url.pathname === '/sitemap') {
+			url.pathname = '/sitemap.xml';
+			return Response.redirect(url.toString(), 301);
+		}
+
 		if (url.pathname === '/sitemap.xml') {
 			// 只登记介绍页。邮件应用本体（登录/收件箱）是登录后才可见的功能界面，
 			// 没有收录价值，而且放出去等于把注册入口交给爬虫，所以那边设了 noindex。
