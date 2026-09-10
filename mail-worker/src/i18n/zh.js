@@ -36,6 +36,8 @@ const zh = {
 	disabledRegister: '注册功能已关闭',
 	cannotGrantHigherRole: '不能授予超出自身权限的身份',
 	emptyReceiveEmail: '收件人不能为空',
+	aliasNotAllowed: '注册时不能使用 + 别名，请先注册基础地址',
+	pwdDecryptFail: '密码解密失败，请刷新页面后重试',
 	pwdLengthLimit: '密码长度超出限制',
 	emailLengthLimit: '邮箱长度超出限制',
 	minEmailPrefix: '邮箱名至少{{msg}}位',

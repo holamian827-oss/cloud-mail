@@ -18,7 +18,7 @@ const oauthService = {
 
 	async bindUser(c, params) {
 
-		const { email, code, bindTicket } = params;
+		const { email, code, bindTicket, token } = params;
 
 		// 这个接口在未登录状态下调用(前端首登建号)，所以不能靠会话鉴权。
 		// 之前的实现直接信任前端自报的 oauthUserId —— 任何人只要编一个
@@ -45,7 +45,8 @@ const oauthService = {
 			throw new BizError('用户已绑定有邮箱')
 		}
 
-		await loginService.register(c, { email, password: cryptoUtils.genRandomPwd(), code }, true);
+		// token 一并透传：OAuth 建号同样是「注册」，必须遵守后台的人机验证设置
+		await loginService.register(c, { email, password: cryptoUtils.genRandomPwd(), code, token }, true);
 
 		userRow = await userService.selectByEmail(c, email);
 

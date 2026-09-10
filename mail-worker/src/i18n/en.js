@@ -36,6 +36,8 @@ const en = {
 	disabledRegister: 'Registration is disabled',
 	cannotGrantHigherRole: 'Cannot grant a role with permissions beyond your own',
 	emptyReceiveEmail: 'Recipients cannot be empty',
+	aliasNotAllowed: 'You cannot register a "+" alias; please register the base address first',
+	pwdDecryptFail: 'Password decryption failed, please refresh and try again',
 	pwdLengthLimit: 'Password length exceeds the limit',
 	emailLengthLimit: 'Email length exceeds the limit',
 	minEmailPrefix: 'Email must be at least {{msg}} characters',

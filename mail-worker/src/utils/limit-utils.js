@@ -29,6 +29,11 @@ const limitUtils = {
 		}
 	},
 
+	/** 读取当前窗口内的失败次数（用于「失败到阈值后要求人机验证」这类判断） */
+	async getCount(c, scope, id) {
+		return Number(await c.env.kv.get(this.key(scope, id))) || 0;
+	},
+
 	async recordFail(c, scope, id) {
 		const key = this.key(scope, id);
 		const count = (Number(await c.env.kv.get(key)) || 0) + 1;

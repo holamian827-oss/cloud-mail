@@ -65,13 +65,26 @@ export async function email(message, env, ctx) {
 			return;
 		}
 
-		let account = await accountService.selectByEmailIncludeDel({ env: env }, message.to);
+		// 别名投递顺序：带 `+` 的收件人**优先投给基础地址**。
+		//
+		// 顺序在这里是安全性质，不是风格问题：
+		// 若先按完整地址精确匹配，任何人只要抢先注册 `别人+标签@域名`，
+		// 就能截走发往该别名的邮件 —— 而 `+标签` 正是很多服务区分注册来源的
+		// 常规写法（victim+github@、victim+paypal@），抢注一批即可持续截信。
+		// 优先投基础地址后，别名始终回到真正的拥有者手里，**存量被抢注的别名也一并失效**。
+		//
+		// 正常语义下 `名字+标签@域名` 本来就该投给 `名字@域名`，所以这不改变
+		// 别名的预期行为，只是在"恰好存在同名带 + 账号"时不再被它劫走。
+		const baseEmail = emailUtils.getBaseEmail(message.to);
+
+		let account = null;
+
+		if (baseEmail && baseEmail !== message.to) {
+			account = await accountService.selectByEmailIncludeDel({ env: env }, baseEmail);
+		}
 
 		if (!account) {
-			const baseEmail = emailUtils.getBaseEmail(message.to);
-			if (baseEmail && baseEmail !== message.to) {
-				account = await accountService.selectByEmailIncludeDel({ env: env }, baseEmail);
-			}
+			account = await accountService.selectByEmailIncludeDel({ env: env }, message.to);
 		}
 
 		if (!account && noRecipient === settingConst.noRecipient.CLOSE) {

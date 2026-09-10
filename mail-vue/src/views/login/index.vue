@@ -41,6 +41,13 @@
           </el-input>
           <el-input v-model="form.password" :placeholder="$t('password')" type="password" autocomplete="off" @keyup.enter="submit">
           </el-input>
+          <!-- 密码连续输错到阈值后才会显示：后端会返回 430 提示需要人机验证 -->
+          <div v-show="loginVerifyShow"
+               class="login-turnstile"
+               :data-sitekey="settingStore.settings.siteKey"
+               data-callback="onLoginTurnstileSuccess"
+               data-error-callback="onLoginTurnstileError"
+          ></div>
           <el-button class="btn" type="primary" @click="submit" :loading="loginLoading"
           >{{ $t('loginBtn') }}
           </el-button>
@@ -146,6 +153,13 @@
                   type="text" autocomplete="off" @keyup.enter="bind"/>
         <el-input v-if="settingStore.settings.regKey === 2" v-model="bindForm.code"
                   :placeholder="$t('regKeyOptional')" type="text" autocomplete="off" @keyup.enter="bind"/>
+        <!-- OAuth 首登建号也是注册，所以同样要遵守后台的「注册人机验证」设置 -->
+        <div v-show="bindVerifyShow"
+             class="bind-turnstile"
+             :data-sitekey="settingStore.settings.siteKey"
+             data-callback="onBindTurnstileSuccess"
+             data-error-callback="onBindTurnstileError"
+        ></div>
         <el-button class="btn" type="primary" @click="bind" :loading="bindLoading"
         >绑定
         </el-button>
@@ -162,6 +176,7 @@ import {login} from "@/request/login.js";
 import {register} from "@/request/login.js";
 import {websiteConfig} from "@/request/setting.js";
 import {isEmail} from "@/utils/verify-utils.js";
+import {encryptPassword} from "@/utils/password-crypto.js";
 import {useSettingStore} from "@/store/setting.js";
 import {useAccountStore} from "@/store/account.js";
 import {useUserStore} from "@/store/user.js";
@@ -260,6 +275,90 @@ window.loadAfter = (e) => {
   console.log('loadAfter')
 }
 
+// ---- 登录的人机验证 ----
+// 只在「同一账号密码连续输错到阈值」后才出现：后端返回 430，前端再把控件渲染出来。
+// 平时不显示，正常登录不受影响。
+const loginVerifyShow = ref(false)
+let loginVerifyToken = ''
+let loginTurnstileId = null
+
+window.onLoginTurnstileSuccess = (token) => {
+  loginVerifyToken = token
+}
+
+window.onLoginTurnstileError = (e) => {
+  console.warn('登录人机验证加载失败', e)
+  setTimeout(() => {
+    nextTick(() => {
+      if (!loginTurnstileId) {
+        loginTurnstileId = window.turnstile.render('.login-turnstile')
+      } else {
+        window.turnstile.reset(loginTurnstileId)
+      }
+    })
+  }, 1500)
+}
+
+// 渲染或刷新登录用的验证码控件
+function renderLoginTurnstile() {
+  nextTick(() => {
+    if (!window.turnstile) {
+      return
+    }
+    if (!loginTurnstileId) {
+      loginTurnstileId = window.turnstile.render('.login-turnstile')
+    } else {
+      window.turnstile.reset(loginTurnstileId)
+    }
+  })
+}
+
+// ---- OAuth 绑定建号的人机验证 ----
+// 走的是和注册表单同一套判断：后台设成「始终要求」或「按次数」且已超阈值时显示。
+const bindVerifyShow = ref(false)
+let bindVerifyToken = ''
+let bindTurnstileId = null
+
+window.onBindTurnstileSuccess = (token) => {
+  bindVerifyToken = token
+}
+
+window.onBindTurnstileError = (e) => {
+  console.warn('绑定人机验证加载失败', e)
+  setTimeout(() => {
+    nextTick(() => {
+      if (!bindTurnstileId) {
+        bindTurnstileId = window.turnstile.render('.bind-turnstile')
+      } else {
+        window.turnstile.reset(bindTurnstileId)
+      }
+    })
+  }, 1500)
+}
+
+// 与注册表单同一条件：始终要求(0)，或按次数(2)且当前已超阈值
+function needRegisterVerify() {
+  const s = settingStore.settings
+  return s.registerVerify === 0 || (s.registerVerify === 2 && s.regVerifyOpen)
+}
+
+function renderBindTurnstile() {
+  if (!needRegisterVerify()) {
+    return
+  }
+  bindVerifyShow.value = true
+  nextTick(() => {
+    if (!window.turnstile) {
+      return
+    }
+    if (!bindTurnstileId) {
+      bindTurnstileId = window.turnstile.render('.bind-turnstile')
+    } else {
+      window.turnstile.reset(bindTurnstileId)
+    }
+  })
+}
+
 window.loadBefore = (e) => {
   console.log('loadBefore')
 }
@@ -331,6 +430,8 @@ async function oauthGetUser() {
 
     if (!data.token) {
       showBindForm.value = true
+      // 这个对话框干的就是「注册一个邮箱」，所以要按注册的设置决定是否要人机验证
+      renderBindTurnstile()
       oauthLoading.value = false
       ElMessage({
         message: '请注册绑定一个邮箱',
@@ -396,11 +497,22 @@ function bind() {
 
   }
 
+  // 后台要求人机验证时，必须先拿到 token
+  if (needRegisterVerify() && !bindVerifyToken) {
+    ElMessage({
+      message: t('needBotVerify'),
+      type: 'error',
+      plain: true,
+    })
+    return
+  }
+
   const form = {
     email,
     oauthUserId: bindForm.oauthUserId,
     code: bindForm.code,
-    bindTicket: bindForm.bindTicket
+    bindTicket: bindForm.bindTicket,
+    token: bindVerifyToken
   }
 
   bindLoading.value = true
@@ -411,7 +523,7 @@ function bind() {
   })
 }
 
-const submit = () => {
+const submit = async () => {
 
   if (loginLoading.value) return
 
@@ -444,9 +556,27 @@ const submit = () => {
     return
   }
 
+  // 已经要求人机验证时，必须先拿到 token 再提交
+  if (loginVerifyShow.value && !loginVerifyToken) {
+    ElMessage({
+      message: t('needBotVerify'),
+      type: 'error',
+      plain: true,
+    })
+    return
+  }
+
   loginLoading.value = true
-  login(email, form.password).then(async data => {
+  // 密码先加密再出网（未配置服务端密钥时原样返回明文，由 TLS 保护）
+  const encryptedPassword = await encryptPassword(form.password)
+  login(email, encryptedPassword, loginVerifyToken).then(async data => {
     await saveToken(data.token)
+  }).catch(e => {
+    // 430 = 后端要求人机验证（该账号密码连续输错到阈值）
+    if (e?.code === 430) {
+      loginVerifyShow.value = true
+      renderLoginTurnstile()
+    }
   }).finally(() => {
     loginLoading.value = false
   })
@@ -483,7 +613,7 @@ function refreshWebsiteConfig() {
 }
 
 
-function submitRegister() {
+async function submitRegister() {
 
   if (registerLoading.value) return
 
@@ -589,7 +719,8 @@ function submitRegister() {
 
   const form = {
     email,
-    password: registerForm.password,
+    // 与服务端私钥配对加密后再提交（未配置密钥时原样返回明文）
+    password: await encryptPassword(registerForm.password),
     token: verifyToken,
     code: registerForm.code
   }

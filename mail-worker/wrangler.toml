@@ -52,6 +52,12 @@ crons = ["0 * * * *"]	#每小时执行；resetDaySendCount 仅在 UTC 0 点生�
 #resend_webhook_secret = ""	#Resend 回调的 Svix 签名密钥(形如 whsec_xxx)。
 #							  不配置时 /webhooks 不校验签名,任何人都能伪造邮件投递状态;
 #							  建议在 Resend 后台配置 webhook 后把它填上。
+#							  —— 登录密码的应用层加密**无需配置,开箱即用**：
+#							  服务端首次需要时会自动生成一套 ECDH 密钥并存进 KV，
+#							  前端拿公钥把密码加密后再提交，抓包只能看到密文。
+#							  没有可配置的 secret，也不用你管轮换。
+#							  （用 ECDH 而不是 RSA：RSA-2048 运行时生成要 ~64ms，
+#							   会把免费版 10ms 的 CPU 预算打爆；ECDH P-256 只要 ~0.6ms）
 
 [build]
 command = "pnpm --prefix ../mail-vue install && pnpm --prefix ../mail-vue run build"

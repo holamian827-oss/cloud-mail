@@ -1,7 +1,8 @@
 import http from '@/axios/index.js';
 
-export function login(email, password) {
-    return http.post('/login', {email: email, password: password})
+// token：密码连续输错到阈值后，后端要求附带人机验证 token（见 views/login 的 430 处理）
+export function login(email, password, token) {
+    return http.post('/login', {email: email, password: password, token: token})
 }
 
 export function logout() {

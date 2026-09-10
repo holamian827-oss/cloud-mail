@@ -126,6 +126,12 @@ const publicService = {
 				throw new BizError(t('notEmail'));
 			}
 
+			// 与 /register 同一条规则：不允许通过建号接口创建 `+` 别名。
+			// 否则可以抢先注册 `别人+标签@域名` 来截收发给该别名的邮件。
+			if (emailUtils.getName(emailRow.email).includes('+')) {
+				throw new BizError(t('aliasNotAllowed'));
+			}
+
 			// 前缀策略必须和 /register、/account/add 一致，
 			// 否则同一条策略在公开接口上形同虚设。
 			if (emailUtils.getName(emailRow.email).length < minEmailPrefix) {

@@ -363,6 +363,12 @@ const userService = {
 			throw new BizError(t('notEmailDomain'));
 		}
 
+		// 与 /register 同一条规则：不允许通过建号接口创建 `+` 别名。
+		// 别名只能走 /account/add —— 那里能校验基础地址的归属。
+		if (emailUtils.getName(email).includes('+')) {
+			throw new BizError(t('aliasNotAllowed'));
+		}
+
 		if (password.length < 6) {
 			throw new BizError(t('pwdMinLength'));
 		}

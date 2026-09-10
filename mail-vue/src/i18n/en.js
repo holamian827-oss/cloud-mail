@@ -124,6 +124,7 @@ const en = {
     attachments: 'Attachments',
     attCount: 'Total {total}',
     aboutSite: 'Learn about this mail service',
+    needBotVerify: 'Please complete the human verification first',
     attLimit: 'No more than 10 attachments',
     attTooLarge: 'Each attachment must not exceed {msg}MB',
     attTotalTooLarge: 'Total attachment size must not exceed {msg}MB',

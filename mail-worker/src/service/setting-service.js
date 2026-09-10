@@ -10,6 +10,7 @@ import {t} from '../i18n/i18n'
 import verifyRecordService from './verify-record-service';
 import userContext from '../security/user-context';
 import domainUtils from '../utils/domain-uitls';
+import eciesUtils from '../utils/crypto-ecies';
 
 const settingService = {
 
@@ -195,7 +196,12 @@ const settingService = {
 		const settingRow = await this.get(c, true);
 		const token = await userContext.getToken(c);
 
+		// 登录密码的应用层加密：前端拿这个公钥加密后再提交。
+		// 未配置 login_private_key 时返回 null，前端自动按明文提交（向后兼容）。
+		const loginPubKey = await eciesUtils.publicKeyBase64(c);
+
 		return {
+			loginPubKey,
 			register: settingRow.register,
 			title: settingRow.title,
 			manyEmail: settingRow.manyEmail,

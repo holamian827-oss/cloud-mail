@@ -23,23 +23,38 @@ import verifyRecordService from './verify-record-service';
 import limitUtils from '../utils/limit-utils';
 import reqUtils from '../utils/req-utils';
 import securityLog from '../utils/security-log';
+import eciesUtils from '../utils/crypto-ecies';
+
+// 同一账号连续失败多少次后，登录必须过人机验证
+const LOGIN_CAPTCHA_THRESHOLD = 3;
 
 const loginService = {
 
 	async register(c, params, oauth = false) {
 
-		const { email, password, token, code } = params;
+		let { email, password, token, code } = params;
+
+		// 与登录同一套：注册的密码也可能是应用层加密过的
+		if (eciesUtils.isEncrypted(password)) {
+			const plain = await eciesUtils.decrypt(c, password);
+
+			if (plain === null) {
+				throw new BizError(t('pwdDecryptFail'));
+			}
+
+			password = plain;
+		}
 
 		let { regKey, register, registerVerify, regVerifyCount, minEmailPrefix, emailPrefixFilter } = await settingService.query(c)
 
-		if (oauth) {
-			// 第三方平台已经验证过这个人，所以跳过人机验证是合理的。
-			registerVerify = settingConst.registerVerify.CLOSE;
-
-			// 但**不能**顺手把 register 强制成 OPEN —— 那等于"关闭注册"这个开关
-			// 对 OAuth 首登完全失效，任何人拿几个第三方小号就能无限建号。
-			// 注册开关是管理员的决定，OAuth 也必须遵守。
-		}
+		// oauth 分支**不再改写任何开关**。
+		//
+		// 这里原来做了两件事，都是错的：
+		//   1. registerVerify = CLOSE —— 强制跳过人机验证。等于管理员在后台设的
+		//      「始终要求验证码」对 OAuth 首登完全失效，可以拿第三方小号无限建号。
+		//   2. register = OPEN —— 已在上一轮移除，同理，注册开关必须被遵守。
+		// 现在 register / registerVerify 一律按后台设置执行；OAuth 绑定对话框
+		// 里也会显示人机验证控件（见 views/login）。
 
 		if (register === settingConst.register.CLOSE) {
 			throw new BizError(t('regDisabled'));
@@ -58,6 +73,20 @@ const loginService = {
 
 		if (!verifyUtils.isEmail(email)) {
 			throw new BizError(t('notEmail'));
+		}
+
+		// 禁止在注册时使用 `+` 别名（安全修复，别删）。
+		//
+		// 收信是「先按完整地址精确匹配，匹配不到才回退到 + 前面的基础地址」。
+		// 所以只要放行，任何人都能抢先注册 `别人+任意标签@域名`，
+		// 把自己变成那个别名的收件人 —— 而 `+标签` 恰恰是很多服务用来区分
+		// 注册来源的常规写法（victim+github@、victim+paypal@），
+		// 抢注一批就能持续截收别人的验证邮件与找回邮件。
+		//
+		// 别名本质上是从属地址，只能创建在「基础地址归属可验证」的地方，
+		// 也就是 /account/add（那里会校验基础地址属于同一个用户）。
+		if (emailUtils.getName(email).includes('+')) {
+			throw new BizError(t('aliasNotAllowed'));
 		}
 
 		if (emailUtils.getName(email).length < minEmailPrefix) {
@@ -230,7 +259,23 @@ const loginService = {
 
 	async login(c, params, noVerifyPwd = false) {
 
-		const { email, password } = params;
+		let { email, password, token } = params;
+
+		// 应用层加密的密码：前端用服务端下发的公钥加密过，这里还原成明文再走原有校验。
+		// 必须是第一步 —— 放在"密码为空"判断之前，否则密文会被当成普通字符串，
+		// 而放在哈希校验之后则完全没意义。
+		// 未加密时（没配私钥，或旧版前端）原样使用，保证向后兼容。
+		if (eciesUtils.isEncrypted(password)) {
+
+			const plain = await eciesUtils.decrypt(c, password);
+
+			// 解密失败通常意味着前端缓存了旧的公钥，让用户刷新重试即可
+			if (plain === null) {
+				throw new BizError(t('pwdDecryptFail'));
+			}
+
+			password = plain;
+		}
 
 		if ((!email || !password) && !noVerifyPwd) {
 			throw new BizError(t('emailAndPwdEmpty'));
@@ -244,6 +289,23 @@ const loginService = {
 		if (!noVerifyPwd) {
 			await limitUtils.assertNotLocked(c, 'login:email', limitEmail);
 			await limitUtils.assertNotLocked(c, 'login:ip', ip);
+
+			// 密码爆破防护的第二道闸：同一账号在窗口内连续失败到阈值后，
+			// 登录必须带人机验证通过后的 token。
+			//
+			// 和上面的"锁定"是互补关系：锁定是硬拒绝（10 次/15 分钟），
+			// 会误伤连续记错密码的正常用户；人机验证只是加一道门槛，
+			// 正常用户点一下就能继续，脚本则被挡住。
+			if (await limitUtils.getCount(c, 'login:email', limitEmail) >= LOGIN_CAPTCHA_THRESHOLD) {
+
+				// 没带 token 时用独立状态码 430 告诉前端「该弹验证码了」，
+				// 前端据此把控件渲染出来并重新提交。
+				if (!token) {
+					throw new BizError(t('emptyBotToken'), 430);
+				}
+
+				await turnstileService.verify(c, token);
+			}
 		}
 
 		let userRow;
