@@ -1,3 +1,7 @@
+# 安全提示:请勿在本文件硬编码数据库ID/JWT密钥,避免随仓库泄露。
+# 下面使用环境变量占位符,部署前先注入:
+#   export D1_DATABASE_ID="你的D1数据库ID"
+#   export JWT_SECRET="你的随机密钥"	# 也可用 wrangler secret put jwt_secret 注入(代码读取的是 c.env.jwt_secret)
 name = "cloud-mail-dev"
 main = "src/index.js"
 compatibility_date = "2025-06-04"
@@ -12,7 +16,7 @@ ip = "0.0.0.0"
 [[d1_databases]]
 binding = "db"
 database_name = "email"
-database_id = "a4c1a63a-6ef5-4e6d-8e8c-b6d9e8feb810"
+database_id = "${D1_DATABASE_ID}"
 
 [[kv_namespaces]]
 binding = "kv"
@@ -41,4 +45,4 @@ analysis_cache = false
 orm_log = true
 domain = ["example.com", "example2.com", "example3.com", "example4.com"]
 admin = "admin@example.com"
-jwt_secret = "b7f29a1d-18e2-4d3b-941f-f6b2c97c02fd"
+jwt_secret = "${JWT_SECRET}"

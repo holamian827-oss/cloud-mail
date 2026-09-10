@@ -73,7 +73,6 @@
 </template>
 
 <script setup>
-import router from "@/router";
 import hanburger from '@/components/hamburger/index.vue'
 import {logout} from "@/request/login.js";
 import {Icon} from "@iconify/vue";
@@ -244,7 +243,11 @@ function clickLogout() {
   logoutLoading.value = true
   logout().then(() => {
     localStorage.removeItem("token")
-    router.replace('/login')
+    // 清除持久化的业务数据，避免换账号登录后残留上一个账号的邮件正文/收件人记录
+    localStorage.removeItem("email")
+    localStorage.removeItem("writer")
+    // 整页刷新：重置内存中的 store 与 init() 动态添加的权限路由
+    location.replace(import.meta.env.BASE_URL + 'login')
   }).finally(() => {
     logoutLoading.value = false
   })

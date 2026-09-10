@@ -79,6 +79,7 @@ function getEmailList() {
 
 async function deleteDraft(draftIds) {
   await db.value.draft.bulkDelete(draftIds);
+  await db.value.att.bulkDelete(draftIds);
   draftStore.refreshList++
 }
 

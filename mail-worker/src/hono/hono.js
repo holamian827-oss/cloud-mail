@@ -4,7 +4,13 @@ const app = new Hono();
 import result from '../model/result';
 import { cors } from 'hono/cors';
 
-app.use('*', cors());
+// CORS 收紧到实际使用的方法与请求头,不使用全通配
+app.use('*', cors({
+	origin: '*',
+	allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+	allowHeaders: ['Content-Type', 'Authorization'],
+	maxAge: 600
+}));
 
 app.onError((err, c) => {
 	if (err.name === 'BizError') {
@@ -29,7 +35,12 @@ app.onError((err, c) => {
 		return c.json(result.fail('请按照文档更新数据库<br/>Please update the database as documented',502));
 	}
 
-	return c.json(result.fail(err.message, err.code));
+	// 业务错误保留原始提示;非预期错误(D1/SQL等)不下发内部细节,仅记录服务端日志
+	if (err.name === 'BizError') {
+		return c.json(result.fail(err.message, err.code));
+	}
+
+	return c.json(result.fail('服务器内部错误,请稍后重试 Server internal error', 500));
 });
 
 export default app;

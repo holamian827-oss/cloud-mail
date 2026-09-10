@@ -3,7 +3,7 @@ import {useUserStore} from "@/store/user.js";
 export default {
     mounted(el, binding) {
         const userStore = useUserStore();
-        const permKeys = userStore.user.permKeys;
+        const permKeys = userStore.user.permKeys || [];
         const value = binding.value;
 
         if (permKeys.includes('*')) {
@@ -22,14 +22,16 @@ export default {
 
 export function hasPerm(permKey) {
     const {permKeys} = useUserStore().user;
-    return permKeys.includes('*') || permKeys.includes(permKey);
+    const keys = permKeys || [];
+    return keys.includes('*') || keys.includes(permKey);
 }
 
 
 export function permsToRouter(permKeys) {
+    const keys = permKeys || [];
     const routerList = []
     Object.keys(routers).forEach(perm => {
-        if (permKeys.includes(perm) || permKeys.includes('*')) {
+        if (keys.includes(perm) || keys.includes('*')) {
             routerList.push(...routers[perm])
         }
     })

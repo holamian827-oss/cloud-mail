@@ -1,15 +1,24 @@
 import settingService from '../service/setting-service';
 import emailUtils from '../utils/email-utils';
 import {emailConst} from "../const/entity-const";
+import limitUtils from '../utils/limit-utils';
+import reqUtils from '../utils/req-utils';
 
 const dbInit = {
 	async init(c) {
 
 		const secret = c.req.param('secret');
+		const ip = reqUtils.getIp(c);
+
+		// 防暴力破解:该接口未鉴权,按 IP 计数锁定
+		await limitUtils.assertNotLocked(c, 'init:ip', ip);
 
 		if (secret !== c.env.jwt_secret) {
+			await limitUtils.recordFail(c, 'init:ip', ip);
 			return c.text('❌ JWT secret mismatch');
 		}
+
+		await limitUtils.clear(c, 'init:ip', ip);
 
 		await this.intDB(c);
 		await this.v1_1DB(c);

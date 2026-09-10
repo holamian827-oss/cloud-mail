@@ -33,6 +33,10 @@ run_worker_first = true
 
 [triggers]
 crons = ["0 * * * *"]	#每小时执行；resetDaySendCount 仅在 UTC 0 点生效
+#注意:index.js 里还有一个 `c.cron === '*/30 * * * *'` 分支(只刷新分析数据缓存)。
+#当前只配了每小时,那个分支永远不会命中 —— 也就是说打开 analysis_cache 之后
+#缓存不会被刷新。要么把这里改成 ["*/30 * * * *"](但清理类任务会变成每半小时跑一次),
+#要么把 analysisService.refreshEchartsCache 挪到下面的每小时分支里。
 
 
 [vars]
@@ -41,7 +45,13 @@ crons = ["0 * * * *"]	#每小时执行；resetDaySendCount 仅在 UTC 0 点生�
 #orm_log = false			#是否sql日志
 #domain = []				#邮件域名可可配置多个 示例: ["example1.com","example2.com"]
 #admin = ""					#管理员的邮箱	示例: admin@example.com
-#jwt_secret = ""			#jwt令牌的密钥,随便填一串字符串
+#jwt_secret = ""			#jwt令牌的密钥【重要】不要用可猜的短字符串,生成一个足够长的随机值:
+#							  openssl rand -hex 32  或  node -e "console.log(crypto.randomUUID()+crypto.randomUUID())"
+#							  它一旦泄露,任何人都能伪造任意用户的登录令牌。建议用
+#							  `wrangler secret put jwt_secret` 注入而不是写在这个文件里。
+#resend_webhook_secret = ""	#Resend 回调的 Svix 签名密钥(形如 whsec_xxx)。
+#							  不配置时 /webhooks 不校验签名,任何人都能伪造邮件投递状态;
+#							  建议在 Resend 后台配置 webhook 后把它填上。
 
 [build]
 command = "pnpm --prefix ../mail-vue install && pnpm --prefix ../mail-vue run build"

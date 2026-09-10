@@ -119,7 +119,16 @@ const accountService = {
 		size = Number(size);
 		lastSort = Number(lastSort);
 
+		if (isNaN(size)) {
+			size = 30;
+		}
+
 		if (size > 30) {
+			size = 30;
+		}
+
+		// 下限钳制：size 为负数时 SQLite 的 LIMIT -1 会退化为全表扫描
+		if (size < 1) {
 			size = 30;
 		}
 
@@ -154,6 +163,10 @@ const accountService = {
 
 		const user = await userService.selectById(c, userId);
 		const accountRow = await this.selectById(c, accountId);
+
+		if (!accountRow) {
+			throw new BizError(t('notExistAccount'));
+		}
 
 		if (accountRow.email === user.email) {
 			throw new BizError(t('delMyAccount'));
@@ -191,8 +204,14 @@ const accountService = {
 	},
 
 	async physicsDeleteByUserIds(c, userIds) {
-		await emailService.physicsDeleteUserIds(c, userIds);
-		await orm(c).delete(account).where(inArray(account.userId,userIds)).run();
+		// in 查询受 D1 100 个绑定参数限制，按每批 90 个 id 分片执行
+		const batchSize = 90;
+
+		for (let i = 0; i < userIds.length; i += batchSize) {
+			const ids = userIds.slice(i, i + batchSize);
+			await emailService.physicsDeleteUserIds(c, ids);
+			await orm(c).delete(account).where(inArray(account.userId, ids)).run();
+		}
 	},
 
 	async selectUserAccountCountList(c, userIds, del = isDel.NORMAL) {
@@ -240,13 +259,26 @@ const accountService = {
 		num = Number(num)
 		size = Number(size)
 
+		if (isNaN(size)) {
+			size = 30;
+		}
+
 		if (size > 30) {
+			size = 30;
+		}
+
+		// 下限钳制：size 为负数时 SQLite 的 LIMIT -1 会退化为全表扫描
+		if (size < 1) {
 			size = 30;
 		}
 
 		num = (num - 1) * size;
 
 		const userRow = await userService.selectByIdIncludeDel(c, userId);
+
+		if (!userRow) {
+			throw new BizError(t('notExistUser'));
+		}
 
 		const list = await orm(c).select().from(account).where(and(eq(account.userId, userId),ne(account.email,userRow.email))).limit(size).offset(num);
 		const { total } = await orm(c).select({ total: count() }).from(account).where(eq(account.userId, userId)).get();
@@ -264,7 +296,7 @@ const accountService = {
 		let a = null
 		const { accountId } = params;
 		const accountRow = await this.selectById(c, accountId);
-		if (accountRow.userId !== userId) {
+		if (!accountRow || accountRow.userId !== userId) {
 			return;
 		}
 		await orm(c).update(account).set({ allReceive: accountConst.allReceive.CLOSE }).where(eq(account.userId, userId)).run();
@@ -274,8 +306,19 @@ const accountService = {
 	async setAsTop(c, params, userId) {
 		const { accountId } = params;
 		const userRow = await userService.selectById(c, userId);
+
+		if (!userRow) {
+			throw new BizError(t('notExistUser'));
+		}
+
 		const mainAccountRow = await accountService.selectByEmailIncludeDel(c, userRow.email);
-		let mainSort = mainAccountRow.sort === 0 ? 2 : mainAccountRow.sort + 1;
+
+		if (!mainAccountRow) {
+			throw new BizError(t('notExistAccount'));
+		}
+
+		// sort 为 null/0 时都按 0 处理，避免 null + 1 得到 1 这一错误的排序值
+		let mainSort = !mainAccountRow.sort ? 2 : mainAccountRow.sort + 1;
 		await orm(c).update(account).set({ sort: mainSort }).where(eq(account.email, userRow.email )).run();
 		await orm(c).update(account).set({ sort: mainSort - 1 }).where(and(eq(account.accountId, accountId),eq(account.userId,userId))).run();
 	}

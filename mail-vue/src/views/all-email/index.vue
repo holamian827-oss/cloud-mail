@@ -174,7 +174,12 @@ const selectTitle = computed(() => {
 
 const paramsStar = localStorage.getItem('all-email-params')
 if (paramsStar) {
-  const locaParams = JSON.parse(paramsStar)
+  let locaParams = {}
+  try {
+    locaParams = JSON.parse(paramsStar) || {}
+  } catch (e) {
+    locaParams = {}
+  }
   params.type = locaParams.type
   params.timeSort = locaParams.timeSort
   params.status = locaParams.status

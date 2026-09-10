@@ -46,6 +46,19 @@ const starService = {
 		emailId = Number(emailId) || 0;
 		size = Number(size);
 		full = Number(full) === 1;
+
+		// 下限钳制：size 为负数时 SQLite 的 LIMIT -1 会退化为全表扫描
+		if (isNaN(size)) {
+			size = 50;
+		}
+
+		if (size > 50) {
+			size = 50;
+		}
+
+		if (size < 1) {
+			size = 50;
+		}
 		const columns = full ? emailListColumns : emailBriefColumns;
 
 		const list = await orm(c).select({
@@ -80,11 +93,21 @@ const starService = {
 		return { list };
 	},
 	async removeByEmailIds(c, emailIds) {
-		await orm(c).delete(star).where(inArray(star.emailId, emailIds)).run();
+		// in 查询受 D1 100 个绑定参数限制，按每批 90 个 id 分片执行
+		const batchSize = 90;
+
+		for (let i = 0; i < emailIds.length; i += batchSize) {
+			await orm(c).delete(star).where(inArray(star.emailId, emailIds.slice(i, i + batchSize))).run();
+		}
 	},
 
 	async removeByUserIds(c, userIds) {
-		await orm(c).delete(star).where(inArray(star.userId, userIds)).run();
+		// in 查询受 D1 100 个绑定参数限制，按每批 90 个 id 分片执行
+		const batchSize = 90;
+
+		for (let i = 0; i < userIds.length; i += batchSize) {
+			await orm(c).delete(star).where(inArray(star.userId, userIds.slice(i, i + batchSize))).run();
+		}
 	}
 };
 

@@ -110,10 +110,17 @@ const userService = {
 	async physicsDelete(c, params) {
 		let { userIds } = params;
 		userIds = userIds.split(',').map(Number);
-		await starService.removeByUserIds(c, userIds);
-		await accountService.physicsDeleteByUserIds(c, userIds);
-		await oauthService.deleteByUserIds(c, userIds);
-		await orm(c).delete(user).where(inArray(user.userId, userIds)).run();
+
+		// in 查询受 D1 100 个绑定参数限制，按每批 90 个 id 分片执行
+		const batchSize = 90;
+
+		for (let i = 0; i < userIds.length; i += batchSize) {
+			const ids = userIds.slice(i, i + batchSize);
+			await starService.removeByUserIds(c, ids);
+			await accountService.physicsDeleteByUserIds(c, ids);
+			await oauthService.deleteByUserIds(c, ids);
+			await orm(c).delete(user).where(inArray(user.userId, ids)).run();
+		}
 	},
 
 	async list(c, params) {
@@ -134,6 +141,11 @@ const userService = {
 		}
 
 		if (size > 50) {
+			size = 50;
+		}
+
+		// 下限钳制：size 为负数时 SQLite 的 LIMIT -1 会退化为全表扫描
+		if (size < 1) {
 			size = 50;
 		}
 

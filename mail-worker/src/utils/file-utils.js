@@ -1,4 +1,32 @@
+// 会被浏览器当作 HTML/XML 解析的类型。这类内容一旦以「内联」方式从本站返回，
+// 就会在应用的 origin 下执行脚本。
+// 攻击路径：发件人把 HTML 存成附件 → 对象名是内容哈希，发件人自己知道内容就能算出来
+// → 把 /attachments/<hash>.html 发给受害者 → 受害者点开即中招（存储型 XSS，可直接盗 token）。
+const DANGEROUS_INLINE_TYPES = new Set([
+	'text/html',
+	'application/xhtml+xml',
+	'image/svg+xml',
+	'application/xml',
+	'text/xml',
+	'text/xsl',
+	'application/xslt+xml'
+]);
+
 const fileUtils = {
+
+	/**
+	 * 该 MIME 类型内联返回是否有脚本执行风险。
+	 * 返回 true 时，调用方必须强制 Content-Disposition: attachment。
+	 * 注意：octet-stream 是安全的 —— 浏览器遇到它只会下载，不会当页面渲染。
+	 */
+	isDangerousInlineType(contentType) {
+		if (!contentType) {
+			return false;
+		}
+		const type = String(contentType).split(';')[0].trim().toLowerCase();
+		return DANGEROUS_INLINE_TYPES.has(type);
+	},
+
 	getExtFileName(filename) {
 		try {
 			const index = filename.lastIndexOf('.');

@@ -23,6 +23,7 @@ const route = useRoute()
 let  innerWidth =  window.innerWidth
 
 let elNotification = null
+let noticeStyle = null
 
 const accountShow = computed(() => {
   return uiStore.accountShow && settingStore.settings.manyEmail === 0
@@ -60,14 +61,17 @@ function showNotice(data) {
     elNotification.close()
   }
 
-  const style = document.createElement('style');
-  style.innerHTML = `
+  // 复用一个 style 节点，避免每次弹出通知都往 head 里追加新节点
+  if (!noticeStyle) {
+    noticeStyle = document.createElement('style');
+    document.head.appendChild(noticeStyle);
+  }
+
+  noticeStyle.innerHTML = `
   .custom-notice.el-notification {
     --el-notification-width: min(${data.noticeWidth}px,calc(100% - 30px)) !important;
   }
   `;
-
-  document.head.appendChild(style);
 
   elNotification = ElNotification({
     title: data.noticeTitle,

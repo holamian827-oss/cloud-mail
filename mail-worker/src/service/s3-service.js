@@ -42,29 +42,8 @@ const s3Service = {
 		const client = await this.client(c);
 		const { bucket } = await settingService.query(c);
 
-
-		client.middlewareStack.add(
-			(next) => async (args) => {
-
-				const body = args.request.body
-
-				// 计算 MD5 校验和并转换为 Base64 编码
-				const encoder = new TextEncoder();
-				const data = encoder.encode(body);
-
-				// 使用 Web Crypto API 计算 MD5 校验和
-				const hashBuffer = await crypto.subtle.digest('MD5', data);
-				const hashArray = new Uint8Array(hashBuffer);
-				const contentMD5 = btoa(String.fromCharCode.apply(null, hashArray));
-
-				args.request.headers["Content-MD5"] = contentMD5;
-
-				return next(args);
-			},
-			{ step: "build", name: "inspectRequestMiddleware" }
-		);
-
-
+		// DeleteObjects 需要的校验和由 AWS SDK 自动计算并添加；
+		// 之前手动计算 Content-MD5 会调用 Workers WebCrypto 不支持的 MD5 而必然抛错，导致对象永远删不掉
 		await client.send(
 			new DeleteObjectsCommand({
 				Bucket: bucket,

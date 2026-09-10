@@ -31,7 +31,21 @@ const attService = {
 
 		}
 
-		await orm(c).insert(att).values(attachments).run();
+		await this.insertAttList(c, attachments);
+	},
+
+	// D1 单条语句最多 100 个绑定参数，附件最多 15 列，按每批 6 行分片插入（6 * 15 = 90 < 100）
+	async insertAttList(c, attList) {
+
+		if (!attList || attList.length === 0) {
+			return;
+		}
+
+		const batchSize = 6;
+
+		for (let i = 0; i < attList.length; i += batchSize) {
+			await orm(c).insert(att).values(attList.slice(i, i + batchSize)).run();
+		}
 	},
 
 	list(c, params, userId) {
@@ -134,7 +148,8 @@ const attService = {
 			image.contentType = dbImage.mimeType;
 
 			const obj = await r2Service.getObj(c, image.key);
-			if (!obj) {
+			// 对象不存在时 service 会返回 404 Response
+			if (!obj || obj.status === 404) {
 				return;
 			}
 
@@ -162,7 +177,7 @@ const attService = {
 			attDataList.push(attData);
 		}
 
-		await orm(c).insert(att).values(attDataList).run();
+		await this.insertAttList(c, attDataList);
 
 		for (let att of attList) {
 			await r2Service.putObj(c, att.key, att.buff, {
@@ -191,7 +206,7 @@ const attService = {
 			delete attData.buff;
 		}
 
-		await orm(c).insert(att).values(attDataList).run();
+		await this.insertAttList(c, attDataList);
 
 	},
 
@@ -214,31 +229,41 @@ const attService = {
 
 	async removeAttByField(c, fieldName, fieldValues) {
 
-		const sqlList = [];
+		// 每个 id 会生成 2 条语句，且 in 查询受 D1 100 个绑定参数限制，按每批 90 个 id 分片执行
+		const batchSize = 90;
 
-		fieldValues.forEach(value => {
+		const delKeyList = [];
 
-			sqlList.push(
+		for (let i = 0; i < fieldValues.length; i += batchSize) {
 
-				c.env.db.prepare(
-					`SELECT a.key, a.att_id
-						FROM attachments a
-							   JOIN (SELECT key
-									 FROM attachments
-									 GROUP BY key
-									 HAVING COUNT (*) = 1) t
-									ON a.key = t.key
-						WHERE a.${fieldName} = ?;`
-					).bind(value)
-			)
+			const values = fieldValues.slice(i, i + batchSize);
+			const sqlList = [];
 
-			sqlList.push(c.env.db.prepare(`DELETE FROM attachments WHERE ${fieldName} = ?`).bind(value))
+			values.forEach(value => {
 
-		});
+				sqlList.push(
 
-		const attListResult = await c.env.db.batch(sqlList);
+					c.env.db.prepare(
+						`SELECT a.key, a.att_id
+							FROM attachments a
+								   JOIN (SELECT key
+										 FROM attachments
+										 GROUP BY key
+										 HAVING COUNT (*) = 1) t
+										ON a.key = t.key
+							WHERE a.${fieldName} = ?;`
+						).bind(value)
+				)
 
-		const delKeyList = attListResult.flatMap(r => r.results ? r.results.map(row => row.key) : []);
+				sqlList.push(c.env.db.prepare(`DELETE FROM attachments WHERE ${fieldName} = ?`).bind(value))
+
+			});
+
+			const attListResult = await c.env.db.batch(sqlList);
+
+			delKeyList.push(...attListResult.flatMap(r => r.results ? r.results.map(row => row.key) : []));
+
+		}
 
 		if (delKeyList.length > 0) {
 			try {

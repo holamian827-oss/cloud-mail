@@ -19,6 +19,8 @@ import dayjs from 'dayjs';
 import { toUtc } from '../utils/date-uitil';
 import { t } from '../i18n/i18n.js';
 import verifyRecordService from './verify-record-service';
+import limitUtils from '../utils/limit-utils';
+import reqUtils from '../utils/req-utils';
 
 const loginService = {
 
@@ -207,22 +209,54 @@ const loginService = {
 			throw new BizError(t('emailAndPwdEmpty'));
 		}
 
-		const userRow = await userService.selectByEmailIncludeDel(c, email);
+		// 防暴力破解:按 账号 与 IP 双维度计数,命中锁定直接拒绝
+		// 账号计数键统一小写去空格,避免改大小写绕过(邮箱查询本身不区分大小写)
+		const ip = reqUtils.getIp(c);
+		const limitEmail = String(email || '').trim().toLowerCase();
 
-		if (!userRow) {
-			throw new BizError(t('notExistUser'));
+		if (!noVerifyPwd) {
+			await limitUtils.assertNotLocked(c, 'login:email', limitEmail);
+			await limitUtils.assertNotLocked(c, 'login:ip', ip);
 		}
 
-		if(userRow.isDel === isDel.DELETE) {
-			throw new BizError(t('isDelUser'));
+		let userRow;
+
+		try {
+
+			userRow = await userService.selectByEmailIncludeDel(c, email);
+
+			if (!userRow) {
+				throw new BizError(t('notExistUser'));
+			}
+
+			if(userRow.isDel === isDel.DELETE) {
+				throw new BizError(t('isDelUser'));
+			}
+
+			if(userRow.status === userConst.status.BAN) {
+				throw new BizError(t('isBanUser'));
+			}
+
+			if (!await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password) && !noVerifyPwd) {
+				throw new BizError(t('IncorrectPwd'));
+			}
+
+		} catch (e) {
+
+			// 登录失败累加计数(含账号不存在/被禁用,避免被用于账号枚举探测)
+			if (!noVerifyPwd) {
+				await limitUtils.recordFail(c, 'login:email', limitEmail);
+				await limitUtils.recordFail(c, 'login:ip', ip);
+			}
+
+			throw e;
 		}
 
-		if(userRow.status === userConst.status.BAN) {
-			throw new BizError(t('isBanUser'));
-		}
-
-		if (!await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password) && !noVerifyPwd) {
-			throw new BizError(t('IncorrectPwd'));
+		if (!noVerifyPwd) {
+			await limitUtils.clear(c, 'login:email', limitEmail);
+			await limitUtils.clear(c, 'login:ip', ip);
+			// 旧版SHA-256哈希校验通过后惰性升级为PBKDF2
+			await this.upgradePasswordIfLegacy(c, userRow, password);
 		}
 
 		const uuid = uuidv4();
@@ -256,12 +290,38 @@ const loginService = {
 		return jwt;
 	},
 
+	// 旧版单轮SHA-256哈希在校验通过后惰性升级为PBKDF2,升级失败不影响本次登录
+	async upgradePasswordIfLegacy(c, userRow, password) {
+
+		if (!cryptoUtils.isLegacyHash(userRow.password)) {
+			return;
+		}
+
+		try {
+			await userService.resetPassword(c, { password }, userRow.userId);
+		} catch (e) {
+			console.error('密码哈希升级失败:', e.message);
+		}
+	},
+
 	async logout(c, userId) {
 		const token =userContext.getToken(c);
 		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
+
+		// 会话信息缺失时直接返回,避免 authInfo.tokens 抛 TypeError
+		if (!authInfo || !Array.isArray(authInfo.tokens)) {
+			return;
+		}
+
 		const index = authInfo.tokens.findIndex(item => item === token);
+
+		// index 为 -1 时 splice(-1, 1) 会误删最后一个会话,必须提前返回
+		if (index === -1) {
+			return;
+		}
+
 		authInfo.tokens.splice(index, 1);
-		await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo));
+		await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
 	}
 
 };

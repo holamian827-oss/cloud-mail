@@ -202,7 +202,11 @@ const oauthProviders = computed(() => {
 const bindForm = reactive({
   email: '',
   oauthUserId: '',
-  code: ''
+  code: '',
+  // 后端在「第三方身份尚未绑定邮箱」时签发的短期票据。
+  // 绑定接口只认这张票据里的身份，所以它必须原样带回，
+  // 少传或过期都会被拒绝（提示重新授权）。
+  bindTicket: ''
 })
 
 const form = reactive({
@@ -319,6 +323,7 @@ async function oauthGetUser() {
   loginFns[provider](code, window.location.origin + '/login').then(data => {
 
     bindForm.oauthUserId = data.userInfo.oauthUserId;
+    bindForm.bindTicket = data.bindTicket || '';
 
     if (!data.token) {
       showBindForm.value = true
@@ -387,7 +392,12 @@ function bind() {
 
   }
 
-  const form = {email, oauthUserId: bindForm.oauthUserId, code: bindForm.code}
+  const form = {
+    email,
+    oauthUserId: bindForm.oauthUserId,
+    code: bindForm.code,
+    bindTicket: bindForm.bindTicket
+  }
 
   bindLoading.value = true
   oauthBindUser(form).then(data => {

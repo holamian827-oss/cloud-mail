@@ -11,6 +11,9 @@ import app from '../hono/hono';
 const exclude = [
 	'/login',
 	'/register',
+	// 必须匿名可访问：邮件内嵌图片与附件下载是浏览器直接发起的 <img>/<a> 请求，
+	// 不会携带 Authorization 头。收紧会让所有内嵌图片和附件下载 401。
+	// 详见 r2-api.js 顶部的说明与残余风险。
 	'/oss',
 	'/setting/websiteConfig',
 	'/webhooks',
@@ -18,7 +21,13 @@ const exclude = [
 	'/public/genToken',
 	'/telegram',
 	'/test',
-	'/oauth'
+	'/oauth/linuxDo/login',
+	'/oauth/github/login',
+	'/oauth/google/login',
+	// bindUser 是 OAuth 首次注册邮箱的入口,前端在未登录状态下调用,因此不能要求会话。
+	// 但它的安全性不靠这条豁免:接口内部会校验回调签发的短期绑定票据
+	// (详见 oauth-service.bindUser 与 saveAndLogin),没有票据无法调用。
+	'/oauth/bindUser'
 ];
 
 const requirePerms = [
@@ -105,7 +114,7 @@ app.use('*', async (c, next) => {
 
 		const userPublicToken = await c.env.kv.get(KvConst.PUBLIC_KEY);
 		const publicToken = c.req.header(constant.TOKEN_HEADER);
-		if (publicToken !== userPublicToken) {
+		if (!timingSafeEqual(publicToken, userPublicToken)) {
 			throw new BizError(t('publicTokenFail'), 401);
 		}
 		return await next();
@@ -176,4 +185,24 @@ function permKeyToPaths(permKeys) {
 		}
 	}
 	return paths;
+}
+
+// 恒定时间字符串比较,避免通过响应时间探测公共token
+function timingSafeEqual(a, b) {
+
+	if (typeof a !== 'string' || typeof b !== 'string') {
+		return false;
+	}
+
+	if (a.length !== b.length) {
+		return false;
+	}
+
+	let diff = 0;
+
+	for (let i = 0; i < a.length; i++) {
+		diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+	}
+
+	return diff === 0;
 }

@@ -4,7 +4,8 @@ import i18n from "@/i18n/index.js";
 import {useSettingStore} from "@/store/setting.js";
 
 let http = axios.create({
-    baseURL: import.meta.env.VITE_BASE_URL
+    baseURL: import.meta.env.VITE_BASE_URL,
+    timeout: 30000
 });
 
 http.interceptors.request.use(config => {
@@ -21,11 +22,8 @@ http.interceptors.response.use((res) => {
             const noMsg = res.config.noMsg;
             const data = res.data
 
-            if (noMsg) {
-
-                data.code === 200 ? resolve(data.data) : reject(data)
-
-            } else if (data.code === 401) {
+            // 鉴权失效必须优先处理，不能被 noMsg 短路绕过
+            if (data.code === 401) {
                 ElMessage({
                     message: data.message,
                     type: 'error',
@@ -46,9 +44,12 @@ http.interceptors.response.use((res) => {
                 })
                 reject(data)
 
+            } else if (noMsg) {
+
+                data.code === 200 ? resolve(data.data) : reject(data)
+
             } else if (data.code === 502) {
                 ElMessage({
-                    dangerouslyUseHTMLString: true,
                     message: data.message,
                     type: 'error',
                     plain: true,
@@ -76,7 +77,7 @@ http.interceptors.response.use((res) => {
             return;
         }
 
-        const noMsg = error.config.noMsg;
+        const noMsg = error.config?.noMsg;
 
         if (noMsg) {
             return Promise.reject(error)
@@ -95,7 +96,6 @@ http.interceptors.response.use((res) => {
                 plain: true,
                 grouping: true
             })
-            ElMessage.error('')
         } else if (error.response) {
             ElMessage({
                 message: i18n.global.t('serverBusyErrorMsg'),

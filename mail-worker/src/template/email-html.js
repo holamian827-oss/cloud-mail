@@ -1,10 +1,49 @@
 import { parseHTML } from 'linkedom';
 import domainUtils from '../utils/domain-uitls';
 
+// 整段移除的危险标签
+const FORBIDDEN_TAGS = ['script', 'iframe', 'object', 'embed', 'frame', 'frameset', 'base', 'form', 'meta'];
+// 需要校验协议的属性
+const URL_ATTRS = ['href', 'xlink:href', 'src', 'action', 'formaction', 'background', 'poster', 'data', 'srcdoc'];
+// 链接类属性,连 data: 协议一并拒绝
+const HREF_ATTRS = ['href', 'xlink:href', 'action', 'formaction', 'srcdoc'];
+// 危险协议(javascript: / vbscript: / data:text/html)
+const DANGEROUS_PROTOCOL = /^(javascript|vbscript):|^data:text\/html/i;
+
 export default function emailHtmlTemplate(html, domain) {
 
 	const { document } = parseHTML(html);
-	document.querySelectorAll('script').forEach(script => script.remove());
+
+	// 清洗邮件HTML:移除危险标签、on* 事件属性与危险协议,防止存储型XSS
+	document.querySelectorAll(FORBIDDEN_TAGS.join(',')).forEach(el => el.remove());
+
+	document.querySelectorAll('*').forEach(el => {
+
+		Array.from(el.attributes).forEach(attr => {
+
+			const name = attr.name.toLowerCase();
+
+			// 移除所有 on* 事件属性
+			if (name.startsWith('on')) {
+				el.removeAttribute(attr.name);
+				return;
+			}
+
+			if (!URL_ATTRS.includes(name) && !name.endsWith(':href')) {
+				return;
+			}
+
+			// 去掉空白/控制字符(charCode <= 32),避免 javascript: 被拆分绕过
+			const value = [...(attr.value || '')].filter(ch => ch.charCodeAt(0) > 32).join('');
+
+			if (DANGEROUS_PROTOCOL.test(value) || (HREF_ATTRS.includes(name) && /^data:/i.test(value))) {
+				el.removeAttribute(attr.name);
+			}
+
+		});
+
+	});
+
 	html = document.toString();
 	html = html.replace(/{{domain}}/g, domainUtils.toOssDomain(domain) + '/');
 	const safeHtmlJson = JSON.stringify(html).replace(/</g, '\\u003C');

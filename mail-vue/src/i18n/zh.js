@@ -120,6 +120,7 @@ const zh = {
     complained: '被标记为垃圾',
     delayed: '发送被延迟',
     bounced: '发送失败',
+    saving: '接收中',
     attachments: '附件列表',
     attCount: '共 {total} 个',
     emailCount: '共 {total} 封',

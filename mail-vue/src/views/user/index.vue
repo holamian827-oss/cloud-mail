@@ -377,7 +377,7 @@
 </template>
 
 <script setup>
-import {defineOptions, h, reactive, ref, watch} from 'vue'
+import {defineOptions, h, onActivated, onDeactivated, onUnmounted, reactive, ref, watch} from 'vue'
 import {
   userList,
   userDelete,
@@ -507,7 +507,12 @@ roleSelectUse().then(list => {
 
 const paramsStar = localStorage.getItem('user-params')
 if (paramsStar) {
-  const localParams = JSON.parse(paramsStar)
+  let localParams = {}
+  try {
+    localParams = JSON.parse(paramsStar) || {}
+  } catch (e) {
+    localParams = {}
+  }
   params.num = localParams.num
   params.size = localParams.size
   params.timeSort = localParams.timeSort
@@ -1043,9 +1048,23 @@ function getUserList(loading = true) {
   })
 }
 
-window.onresize = () => {
+function handleResize() {
   adjustWidth()
-};
+}
+
+window.addEventListener('resize', handleResize)
+
+onActivated(() => {
+  window.addEventListener('resize', handleResize)
+})
+
+onDeactivated(() => {
+  window.removeEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+})
 
 adjustWidth()
 

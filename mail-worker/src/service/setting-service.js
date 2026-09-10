@@ -68,11 +68,13 @@ const settingService = {
 
 	async get(c, showSiteKey = false) {
 
-		const [settingRow, recordList] = await Promise.all([
+		const [settingData, recordList] = await Promise.all([
 			await this.query(c),
 			verifyRecordService.selectListByIP(c)
 		]);
 
+		// 返回浅拷贝再脱敏,避免直接改动 c.get('setting') / KV 中的共享配置对象
+		const settingRow = { ...settingData, resendTokens: { ...settingData.resendTokens } };
 
 		if (!showSiteKey) {
 			settingRow.siteKey = settingRow.siteKey ? `${settingRow.siteKey.slice(0, 6)}******` : null;

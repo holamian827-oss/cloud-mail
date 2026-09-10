@@ -5,7 +5,6 @@ import BizError from '../error/biz-error';
 import rolePerm from '../entity/role-perm';
 import perm from '../entity/perm';
 import { permConst, roleConst } from '../const/entity-const';
-import userService from './user-service';
 import user from '../entity/user';
 import verifyUtils from '../utils/verify-utils';
 import { t } from '../i18n/i18n.js';
@@ -108,10 +107,16 @@ const roleService = {
 
 		const defRoleRow = await orm(c).select().from(role).where(eq(role.isDefault, roleConst.isDefault.OPEN)).get();
 
-		await userService.updateAllUserType(c, defRoleRow.roleId, roleId);
+		if (!defRoleRow) {
+			throw new BizError(t('delDefRole'));
+		}
 
-		await orm(c).delete(rolePerm).where(eq(rolePerm.roleId, roleId)).run();
-		await orm(c).delete(role).where(eq(role.roleId, roleId)).run();
+		// 用户 type 迁移、角色权限删除、角色删除必须是原子的，用 batch（事务语义）避免部分失败留下不一致数据
+		await c.env.db.batch([
+			c.env.db.prepare(`UPDATE user SET type = ? WHERE type = ?`).bind(defRoleRow.roleId, roleId),
+			c.env.db.prepare(`DELETE FROM role_perm WHERE role_id = ?`).bind(roleId),
+			c.env.db.prepare(`DELETE FROM role WHERE role_id = ?`).bind(roleId)
+		]);
 
 	},
 
@@ -175,13 +180,24 @@ const roleService = {
 		return orm(c).select().from(role).where(eq(role.name, roleName)).get();
 	},
 
-	selectByUserIds(c, userIds) {
+	async selectByUserIds(c, userIds) {
 
 		if (!userIds || userIds.length === 0) {
 			return [];
 		}
 
-		return orm(c).select({ ...role, userId: user.userId }).from(user).leftJoin(role, eq(role.roleId, user.type)).where(inArray(user.userId, userIds)).all();
+		// in 查询受 D1 100 个绑定参数限制，按每批 90 个 id 分片查询后合并
+		const batchSize = 90;
+		const result = [];
+
+		for (let i = 0; i < userIds.length; i += batchSize) {
+			const rows = await orm(c).select({ ...role, userId: user.userId }).from(user)
+				.leftJoin(role, eq(role.roleId, user.type))
+				.where(inArray(user.userId, userIds.slice(i, i + batchSize))).all();
+			result.push(...rows);
+		}
+
+		return result;
 
 	},
 

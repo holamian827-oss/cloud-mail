@@ -44,15 +44,24 @@ const r2Service = {
 		const storageType = await this.storageType(c);
 
 		if (storageType === 'KV') {
-			return await kvObjService.getObj(c, key);
+			// 取不到对象时返回 404 Response，避免调用方解引用 null 导致 500
+			return await kvObjService.getObj(c, key) || new Response(null, { status: 404 });
 		}
 
 		if (storageType === 'R2') {
-			return await c.env.r2.get(key);
+			return await c.env.r2.get(key) || new Response(null, { status: 404 });
 		}
 
 		if (storageType === 'S3') {
-			return await s3Service.getObj(c, key);
+			try {
+				return await s3Service.getObj(c, key);
+			} catch (e) {
+				// S3 对象不存在时 SDK 会抛异常，这里统一转为 404 Response
+				if (e.name === 'NoSuchKey' || e.name === 'NotFound' || e?.$metadata?.httpStatusCode === 404) {
+					return new Response(null, { status: 404 });
+				}
+				throw e;
+			}
 		}
 	},
 

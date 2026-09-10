@@ -38,6 +38,7 @@ const editorRef = ref(null);
 const showLoading = ref(false);
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
+let tinyScript = null;
 
 onMounted(() => {
   initTinyMCE();
@@ -45,6 +46,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   destroyEditor();
+  if (tinyScript) {
+    tinyScript.remove();
+    tinyScript = null;
+  }
 });
 
 watch(() => props.defValue, (newValue) => {
@@ -78,10 +83,15 @@ function initTinyMCE() {
   } else {
     showLoading.value = true;
     const script = document.createElement('script');
-    script.src = '/tinymce/tinymce.min.js';
-    script.onload = () => initEditor();
+    tinyScript = script;
+    // 拼接 base，兼容子路径部署
+    script.src = `${import.meta.env.BASE_URL}tinymce/tinymce.min.js`;
+    script.onload = () => {
+      // textarea 是 v-else 渲染的，需先关掉 loading 并等 DOM 更新后再初始化
+      showLoading.value = false;
+      nextTick(() => initEditor());
+    };
     document.head.appendChild(script);
-    showLoading.value = false;
   }
 }
 
@@ -95,7 +105,7 @@ function initEditor() {
     //remove_script_host: false, // 阻止删除 URL 中的域名
     forced_root_block: 'div',
     skin: `${uiStore.dark ? 'oxide-dark' : 'oxide'}`,
-    content_css: `/tinymce/css/index.css,${uiStore.dark ? 'dark' : 'default'}`,
+    content_css: `${import.meta.env.BASE_URL}tinymce/css/index.css,${uiStore.dark ? 'dark' : 'default'}`,
     content_style: `:root {
          --scrollbar-track-color: ${uiStore.dark ? '#141414' : '#FFFFFF'};
          --scrollbar-thumb-color: ${uiStore.dark ? '#8D9095' : '#A8ABB2'};

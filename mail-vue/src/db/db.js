@@ -9,11 +9,9 @@ let db =  shallowRef({})
 
 function createDB() {
     db.value = new Dexie(userStore.user.email);
+    // 同一版本号只声明一次 stores，并一次列全所有表
     db.value.version(1).stores({
-        draft: '++draftId,createTime'
-    })
-
-    db.value.version(1).stores({
+        draft: '++draftId,createTime',
         att: 'draftId'
     })
 }

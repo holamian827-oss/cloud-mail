@@ -14,6 +14,7 @@ import { isDel, roleConst } from '../const/entity-const';
 import email from '../entity/email';
 import userService from './user-service';
 import KvConst from '../const/kv-const';
+import limitUtils from '../utils/limit-utils';
 
 const publicService = {
 
@@ -135,14 +136,15 @@ const publicService = {
 				type = roleRow ? roleRow.roleId : type;
 			}
 
+			// 使用参数化绑定,避免邮箱/UA/IP 等可控字段造成 SQL 注入
 			const userSql = `INSERT INTO user (email, password, salt, type, os, browser, active_ip, create_ip, device, active_time, create_time)
-			VALUES ('${email}', '${hash}', '${salt}', '${type}', '${os}', '${browser}', '${activeIp}', '${activeIp}', '${device}', '${activeTime}', '${activeTime}')`
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 			const accountSql = `INSERT INTO account (email, name, user_id)
-			VALUES ('${email}', '${emailUtils.getName(email)}', 0);`;
+			VALUES (?, ?, 0);`;
 
-			userList.push(c.env.db.prepare(userSql));
-			userList.push(c.env.db.prepare(accountSql));
+			userList.push(c.env.db.prepare(userSql).bind(email, hash, salt, type, os, browser, activeIp, activeIp, device, activeTime, activeTime));
+			userList.push(c.env.db.prepare(accountSql).bind(email, emailUtils.getName(email)));
 
 		}
 
@@ -162,7 +164,19 @@ const publicService = {
 
 	async genToken(c, params) {
 
-		await this.verifyUser(c, params)
+		const ip = reqUtils.getIp(c);
+
+		// 防暴力破解:该接口未鉴权,持续尝试会命中超管密码,按 IP 计数锁定
+		await limitUtils.assertNotLocked(c, 'genToken:ip', ip);
+
+		try {
+			await this.verifyUser(c, params)
+		} catch (e) {
+			await limitUtils.recordFail(c, 'genToken:ip', ip);
+			throw e;
+		}
+
+		await limitUtils.clear(c, 'genToken:ip', ip);
 
 		const uuid = uuidv4();
 
@@ -187,6 +201,15 @@ const publicService = {
 
 		if (!await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password)) {
 			throw new BizError(t('IncorrectPwd'));
+		}
+
+		// 旧版哈希校验通过后惰性升级为PBKDF2,失败不影响本次校验
+		if (cryptoUtils.isLegacyHash(userRow.password)) {
+			try {
+				await userService.resetPassword(c, { password }, userRow.userId);
+			} catch (e) {
+				console.error('密码哈希升级失败:', e.message);
+			}
 		}
 	}
 

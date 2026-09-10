@@ -1,0 +1,578 @@
+/* ============================================================================
+   磨砂玻璃主题层 (Glassmorphism)
+   ----------------------------------------------------------------------------
+   架构约定 —— 改这个文件之前请先读完这一段：
+
+   1. 只覆盖「画」，不覆盖「量」。
+      本文件只改背景 / 边框 / 阴影 / 模糊 / 圆角这几类纯视觉属性，
+      绝不改变宽高、内外边距、定位与 flex/grid 轨道。
+      原因：邮件虚拟列表用 window 高度反推 itemHeight，主视图高度依赖
+      calc(100% - 60px)，侧栏宽 260px。动尺寸会连锁破坏这几处。
+      要加圆角请只加在「浮层」和「卡片」上，不要加在撑满布局的容器上。
+
+   2. 覆盖优先级靠选择器，不靠 !important。
+      - 应用外壳与页内组件都在 #app 内。组件用 <style scoped>，
+        编译后带 [data-v-xxx] 属性 → 优先级 (0,2,0)。
+        这里统一用 `#app xxx` 前缀，(1,1,0) 稳压，无需 !important。
+      - Element Plus 的浮层(el-dialog / el-popper / el-notification)会被
+        teleport 到 body，不在 #app 内，改用 `body xxx` 前缀 (0,1,1)
+        压过 EP 自身的单类选择器 (0,1,0)，同时不依赖样式加载顺序。
+      - 暗色令牌必须写成 `html.dark`：EP 的 dark/css-vars.css 用的就是
+        html.dark (0,1,1)，写成 .dark 会输给它。
+
+   3. 所有视觉参数集中在下面的 --glass-* 令牌里，改一处全局生效。
+      想整体关掉磨砂效果，只把 --glass-blur 设为 0px、
+      并把各 --glass-surface-* 调回不透明即可。
+
+   4. 加载顺序：main.js 中本文件必须在 style.css 与 element-plus 的
+      dark/css-vars.css 之后引入。
+   ============================================================================ */
+
+/* ---------------------------------------------------------------------------
+   1. 设计令牌
+   --------------------------------------------------------------------------- */
+
+html:root {
+	/* 外壳面板：偏冷的中性白，透明度决定「玻璃感」强弱 */
+	--glass-surface: rgba(255, 255, 255, 0.58);
+	--glass-surface-strong: rgba(255, 255, 255, 0.76);
+	--glass-surface-soft: rgba(255, 255, 255, 0.42);
+
+	/* 玻璃的「边缘」：一道亮描边 + 一道冷灰分隔，模仿真实玻璃的折射 */
+	--glass-hairline: rgba(255, 255, 255, 0.68);
+	--glass-edge: rgba(148, 163, 184, 0.20);
+	--glass-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.72);
+
+	/* 阴影：近距离一道柔光 + 远距离一层落地影，靠两层叠出厚度 */
+	--glass-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 32px rgba(15, 23, 42, 0.10);
+	--glass-shadow-lg: 0 2px 8px rgba(15, 23, 42, 0.06), 0 24px 64px rgba(15, 23, 42, 0.18);
+
+	/* 侧栏是深色玻璃，和浅色内容区形成层次 */
+	--glass-aside-bg: rgba(26, 28, 38, 0.62);
+	--glass-aside-hairline: rgba(255, 255, 255, 0.10);
+
+	--glass-blur: 22px;
+	--glass-blur-sm: 14px;
+	--glass-saturate: 180%;
+
+	--glass-radius-lg: 20px;
+	--glass-radius: 14px;
+	--glass-radius-sm: 10px;
+
+	/* 页面底色。
+	   注意：底纹色晕（那几团径向渐变）不在这里，而是内联在 index.html 的
+	   html::before 里 —— 首屏在 bundle 加载前就要有背景，否则会白闪一下。
+	   两处用的是同一组色值，改调色板时记得一起改。 */
+	--glass-page-base: #eef2f8;
+
+	/* 浮层遮罩 */
+	--glass-mask: rgba(15, 23, 42, 0.32);
+}
+
+html.dark:root {
+	--glass-surface: rgba(24, 27, 36, 0.60);
+	--glass-surface-strong: rgba(29, 33, 43, 0.78);
+	--glass-surface-soft: rgba(24, 27, 36, 0.44);
+
+	--glass-hairline: rgba(255, 255, 255, 0.10);
+	--glass-edge: rgba(255, 255, 255, 0.08);
+	--glass-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+
+	--glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.30), 0 8px 32px rgba(0, 0, 0, 0.42);
+	--glass-shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.35), 0 24px 64px rgba(0, 0, 0, 0.55);
+
+	--glass-aside-bg: rgba(15, 17, 24, 0.66);
+	--glass-aside-hairline: rgba(255, 255, 255, 0.08);
+
+	--glass-page-base: #0a0c12;
+
+	--glass-mask: rgba(0, 0, 0, 0.45);
+}
+
+/* ---------------------------------------------------------------------------
+   2. 把 Element Plus 的表面令牌接到玻璃体系上
+      这样表格、输入框、卡片、下拉这些没被单独点名的组件也会自动跟上，
+      不必逐个组件写样式。
+   --------------------------------------------------------------------------- */
+
+html:root {
+	/* 略透的白色表面，让底下的色晕透出来一点 */
+	--el-bg-color: rgba(255, 255, 255, 0.72);
+	--el-bg-color-page: transparent;
+	--el-bg-color-overlay: rgba(255, 255, 255, 0.80);
+	--el-fill-color-blank: rgba(255, 255, 255, 0.50);
+	--el-fill-color-light: rgba(255, 255, 255, 0.40);
+
+	--el-border-radius-base: var(--glass-radius-sm);
+	--el-border-radius-small: 8px;
+	--el-border-radius-round: 999px;
+
+	--el-box-shadow: var(--glass-shadow);
+	--el-box-shadow-light: var(--glass-shadow);
+	--el-box-shadow-lighter: var(--glass-shadow);
+	--el-mask-color: var(--glass-mask);
+}
+
+html.dark:root {
+	--el-bg-color: rgba(24, 27, 36, 0.72);
+	--el-bg-color-overlay: rgba(29, 33, 43, 0.84);
+	--el-fill-color-blank: rgba(255, 255, 255, 0.06);
+	--el-fill-color-light: rgba(255, 255, 255, 0.08);
+}
+
+/* 侧栏与页面底色也一并接管 */
+html:root {
+	--aside-backgound: var(--glass-aside-bg);
+	--aside-menu-active-background: rgba(255, 255, 255, 0.14);
+	--settings-page-background: transparent;
+	--extra-light-fill: transparent;
+	--light-ill: rgba(255, 255, 255, 0.36);
+	--base-fill: rgba(255, 255, 255, 0.42);
+	--loadding-background: rgba(255, 255, 255, 0.55);
+	--email-hover-background: rgba(24, 144, 255, 0.09);
+	--email-right-click-background: rgba(255, 211, 125, 0.22);
+	/* 账户面板选中项：原本是实心主色浅色块，改成透光的主色薄雾 */
+	--choose-account-background: rgba(24, 144, 255, 0.12);
+}
+
+html.dark:root {
+	--aside-backgound: var(--glass-aside-bg);
+	--aside-menu-active-background: rgba(255, 255, 255, 0.10);
+	--light-ill: rgba(255, 255, 255, 0.07);
+	--base-fill: rgba(255, 255, 255, 0.08);
+	--loadding-background: rgba(0, 0, 0, 0.45);
+	--email-hover-background: rgba(24, 144, 255, 0.16);
+	--email-right-click-background: rgba(255, 211, 125, 0.12);
+	--choose-account-background: rgba(24, 144, 255, 0.20);
+}
+
+/* ---------------------------------------------------------------------------
+   3. 页面底纹
+   --------------------------------------------------------------------------- */
+
+/* 只给 html 上底色，body 必须保持透明。
+   原因：底纹画在 index.html 的 html::before 上（层级是「html 背景 → 负 z-index
+   的伪元素」，即色晕叠在底色之上）。若这里再给 body 上背景，body 的背景会盖在
+   html::before 上面，色晕就被糊掉了。 */
+html {
+	background: var(--glass-page-base);
+}
+
+body {
+	background: transparent;
+}
+
+/* ---------------------------------------------------------------------------
+   4. 应用外壳：侧栏 / 顶栏 / 内容区
+   --------------------------------------------------------------------------- */
+
+/* 4.0 全局玻璃底板 —— 整个应用只有这一层做真模糊
+   为什么只做一层：
+   backdrop-filter 除了产生模糊，还会让元素成为「绝对/固定定位后代的包含块」，
+   并新建层叠上下文。如果把模糊加在 .main-container（滚动容器）或 .el-header 上，
+   顶栏里那些 :teleported="false" 的下拉菜单的定位基准就变了，容易错位。
+   而且底纹本身是平滑渐变，多模糊几层看不出区别，纯属白烧性能。
+   所以：模糊只放在这一层底板 + 各个浮层上，外壳面板只用半透明填充和发丝边。 */
+#app .layout::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+	background: var(--glass-surface);
+	-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+	backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+/* 4.1 侧栏 —— 深色玻璃。底纹已经在底板里模糊过了，这里只需要一层深色透明填充 */
+#app .aside,
+#app .aside-show {
+	background: var(--glass-aside-bg);
+}
+
+#app .aside-show {
+	box-shadow: var(--glass-shadow), inset -1px 0 0 0 var(--glass-aside-hairline);
+}
+
+/* 侧栏内部滚动区与菜单保持透明，让底下的玻璃层透上来。
+   el-scrollbar 那条要 !important：组件里是用 :deep() + !important 写的，
+   编译后是 [data-v-x] .el-scrollbar__wrap--hidden-default (0,2,0) 且带
+   !important，光靠 #app 前缀压不住带 !important 的规则。 */
+#app .aside .el-scrollbar__wrap--hidden-default {
+	background: transparent !important;
+}
+
+#app .aside .el-menu,
+#app .aside .el-menu-item {
+	background: transparent;
+}
+
+/* 4.2 顶栏 —— 比底板的玻璃更实一点，压出一条清晰的横向分隔 */
+#app .el-header {
+	background: var(--glass-surface-strong);
+	border-bottom: 1px solid var(--glass-edge);
+	box-shadow: var(--glass-highlight);
+}
+
+/* 4.3 内容区 —— 保持透明，直接坐在底板上。
+   这里千万不能再叠背景：底板的 0.58 白 + 内容区再一层，会变成一堵白墙，
+   底纹就透不出来了。 */
+#app .main-container {
+	background: transparent;
+}
+
+/* 主视图本身不再叠一层玻璃，否则和内容区两层叠加会变成一堵白墙 */
+#app .main-view {
+	background: transparent;
+}
+
+/* 4.4 账户面板 —— 比底板再浅一档，靠右侧发丝边和内容区分开 */
+#app .account-box {
+	background: var(--glass-surface-soft);
+	border-right: 1px solid var(--glass-edge);
+}
+
+/* 4.5 写信浮层
+   .send 本来就是铺满全屏的浮层（只是没有背景），这里补一层薄雾把应用压到后面，
+   让「正在写信」这件事在视觉上成立；.write-box 则是浮在薄雾上的一整块玻璃。 */
+#app .send {
+	background: var(--el-mask-color);
+	-webkit-backdrop-filter: blur(6px);
+	backdrop-filter: blur(6px);
+}
+
+#app .write-box {
+	background: var(--glass-surface-strong);
+	-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+	backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+	border: 1px solid var(--glass-hairline);
+	box-shadow: var(--glass-shadow-lg);
+}
+
+/* ---------------------------------------------------------------------------
+   5. Element Plus 浮层（被 teleport 到 body）
+   --------------------------------------------------------------------------- */
+
+body .el-overlay {
+	background-color: var(--el-mask-color);
+	-webkit-backdrop-filter: blur(6px);
+	backdrop-filter: blur(6px);
+}
+
+body .el-dialog,
+body .el-drawer,
+body .el-message-box {
+	--el-dialog-bg-color: var(--glass-surface-strong);
+	--el-drawer-bg-color: var(--glass-surface-strong);
+	--el-message-box-bg-color: var(--glass-surface-strong);
+	background: var(--glass-surface-strong);
+	-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+	backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+	border: 1px solid var(--glass-hairline);
+	box-shadow: var(--glass-shadow-lg);
+	border-radius: var(--glass-radius-lg);
+	overflow: hidden;
+}
+
+/* 下拉 / 选择器 / 气泡 —— 浮在内容之上，模糊半径小一点避免糊成一片。
+   注意必须带上 .is-light：EP 自己的规则是 `.el-popper.is-light` (0,2,0)，
+   只写 `body .el-popper` (0,1,1) 压不过它，描边和背景会被 EP 覆盖掉。
+   下拉/选择器/日期选择器的 popper 都带 is-light，所以这一个选择器就够了。 */
+body .el-popper.is-light {
+	background: var(--glass-surface-strong);
+	-webkit-backdrop-filter: blur(var(--glass-blur-sm)) saturate(var(--glass-saturate));
+	backdrop-filter: blur(var(--glass-blur-sm)) saturate(var(--glass-saturate));
+	border: 1px solid var(--glass-hairline);
+	border-radius: var(--glass-radius);
+	box-shadow: var(--glass-shadow-lg);
+}
+
+/* 深色 tooltip 保留其对比度，只加一点模糊和圆角 */
+body .el-popper.is-dark {
+	background: rgba(23, 26, 35, 0.86);
+	-webkit-backdrop-filter: blur(var(--glass-blur-sm));
+	backdrop-filter: blur(var(--glass-blur-sm));
+	border: 1px solid rgba(255, 255, 255, 0.10);
+	border-radius: var(--glass-radius-sm);
+}
+
+body .el-popper.is-dark .el-popper__arrow::before {
+	background: rgba(23, 26, 35, 0.86);
+	border-color: rgba(255, 255, 255, 0.10);
+}
+
+/* 消息与通知 */
+body .el-notification,
+body .el-message {
+	background: var(--glass-surface-strong);
+	-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+	backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+	border: 1px solid var(--glass-hairline);
+	border-radius: var(--glass-radius);
+	box-shadow: var(--glass-shadow-lg);
+}
+
+/* ---------------------------------------------------------------------------
+   6. 页内组件：把「实心白块」改成「玻璃薄片」
+   --------------------------------------------------------------------------- */
+
+/* 6.1 卡片
+   注意这里**不写 background**：EP 的卡片背景来自 --el-card-bg-color，
+   而它默认取 --el-fill-color-blank —— 那个令牌上面已经改成半透明了，
+   所以卡片天然就是玻璃的，不需要再覆盖。
+   反过来，一旦在这里直接写 background，本文件的 #app 前缀 (1,1,0) 会盖掉
+   账户面板里 .item-choose[data-v-x] (0,2,0) 的选中高亮 —— 「当前账号」
+   就再也看不出来了。需要改卡片底色时请改令牌，不要改这条规则。 */
+#app .el-card {
+	border: 1px solid var(--glass-hairline);
+	border-radius: var(--glass-radius);
+	box-shadow: var(--glass-shadow);
+	transition: background-color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+/* 6.2 输入类控件：内嵌一道细边，聚焦时透出主色光晕。
+   因为覆盖了 box-shadow，必须把 EP 自带的「校验失败」状态一并写回来，
+   否则表单校验的红框会被这条规则吃掉，用户看不到哪里填错了。 */
+#app .el-input__wrapper,
+#app .el-textarea__inner,
+#app .el-select__wrapper {
+	background: var(--el-fill-color-blank);
+	box-shadow: inset 0 0 0 1px var(--glass-edge);
+	border-radius: var(--glass-radius-sm);
+	transition: box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+#app .el-input__wrapper:hover,
+#app .el-select__wrapper:hover {
+	box-shadow: inset 0 0 0 1px var(--glass-hairline);
+}
+
+#app .el-input__wrapper.is-focus,
+#app .el-select__wrapper.is-focused {
+	box-shadow: inset 0 0 0 1px var(--el-color-primary),
+		0 0 0 3px var(--el-color-primary-light-9);
+}
+
+/* 校验失败：恢复 EP 的红色描边语义 */
+#app .el-input__wrapper.is-error,
+#app .el-textarea__inner.is-error,
+#app .el-select__wrapper.is-error {
+	box-shadow: inset 0 0 0 1px var(--el-color-danger);
+}
+
+#app .el-input__wrapper.is-error.is-focus,
+#app .el-select__wrapper.is-error.is-focused {
+	box-shadow: inset 0 0 0 1px var(--el-color-danger),
+		0 0 0 3px var(--el-color-danger-light-9);
+}
+
+/* 6.3 按钮：轻量圆角 + 主按钮的柔和投影 */
+#app .el-button {
+	border-radius: var(--glass-radius-sm);
+	transition: transform 0.15s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+#app .el-button--primary:not(.is-link):not(.is-text) {
+	box-shadow: 0 4px 14px rgba(24, 144, 255, 0.28);
+}
+
+#app .el-button--primary:not(.is-link):not(.is-text):hover {
+	box-shadow: 0 6px 20px rgba(24, 144, 255, 0.36);
+	transform: translateY(-1px);
+}
+
+#app .el-button:not(.is-link):not(.is-text):active {
+	transform: translateY(0);
+	box-shadow: none;
+}
+
+/* 6.4 表格：只用发丝线分隔。
+   表头和行的底色**不在这里写** —— EP 用的是 --el-table-header-bg-color /
+   --el-table-tr-bg-color / --el-table-row-hover-bg-color，它们默认都指向
+   --el-fill-color-light / --el-fill-color-blank，上面已经改成半透明了。
+   靠令牌生效而不是靠覆盖规则，页面自己给某一行设的背景才不会被这里吃掉。 */
+#app .el-table td.el-table__cell,
+#app .el-table th.el-table__cell {
+	border-bottom: 1px solid var(--glass-edge);
+}
+
+#app .el-table th.el-table__cell {
+	font-weight: 600;
+}
+
+#app .el-table__inner-wrapper::before {
+	background-color: var(--glass-edge);
+}
+
+/* 6.5 分页 / 标签页 */
+#app .el-tag {
+	border-radius: 999px;
+}
+
+#app .el-pagination button,
+#app .el-pager li {
+	background: var(--glass-surface-soft);
+	border-radius: var(--glass-radius-sm);
+}
+
+#app .el-tabs__item {
+	transition: color 0.2s ease;
+}
+
+#app .el-tabs__nav-wrap::after {
+	background-color: var(--glass-edge);
+}
+
+/* 6.6 加载遮罩 */
+#app .el-loading-mask {
+	background-color: var(--glass-surface-soft);
+	-webkit-backdrop-filter: blur(4px);
+	backdrop-filter: blur(4px);
+}
+
+/* ---------------------------------------------------------------------------
+   7. 登录页：把整块侧栏改成悬浮玻璃卡
+      这里放宽了「不动几何」的约束 —— 登录页没有虚拟列表和等宽网格，
+      改尺寸不会连锁影响。移动端断点保留原有的三档适配。
+   --------------------------------------------------------------------------- */
+
+/* 7.1 背景：让出登录页自己的天空渐变。
+   应用底纹已经铺在 index.html 的 html::before 上，覆盖整个视口，
+   登录页就坐在它上面。这里不覆盖 background 的话，原来的
+   linear-gradient(#2980b9 → #6dd5fa → #fff) 会把这层底纹整个盖掉，
+   于是登录页和主应用像两个站。让出之后两边共用同一片底色，天然连贯。
+   管理员在系统设置里配了自定义登录背景图时，图片画在子元素上，
+   而且 .container 那行内联的 background 优先级更高，都不受影响。 */
+#app #login-box {
+	background: transparent;
+}
+
+/* 7.2 把「白色卡通云」换成柔和光晕。
+   原来那五团是实心白 + 硬边阴影的卡通云，和磨砂玻璃的调性差得最远。
+   这里换成的径向渐变本身就是软的，不需要 filter: blur() ——
+   后者会在每一帧对 350px 的方块重新做高斯模糊，飘动时开销很大，
+   而渐变只是换个背景，等于零性能代价换掉整页观感。
+   飘动动画（margin-left）保持不动，所以节奏和原来完全一致。 */
+#app #login-box .cloud {
+	background: none;
+	box-shadow: none;
+	border-radius: 50%;
+}
+
+#app #login-box .cloud::before,
+#app #login-box .cloud::after {
+	display: none;
+}
+
+#app #login-box .x1.cloud {
+	background: radial-gradient(closest-side, rgba(24, 144, 255, 0.50), transparent 72%);
+}
+
+#app #login-box .x2.cloud {
+	background: radial-gradient(closest-side, rgba(124, 92, 255, 0.46), transparent 72%);
+}
+
+#app #login-box .x3.cloud {
+	background: radial-gradient(closest-side, rgba(34, 211, 238, 0.42), transparent 72%);
+}
+
+#app #login-box .x4.cloud {
+	background: radial-gradient(closest-side, rgba(255, 138, 196, 0.38), transparent 72%);
+}
+
+#app #login-box .x5.cloud {
+	background: radial-gradient(closest-side, rgba(255, 255, 255, 0.50), transparent 72%);
+}
+
+/* 注意：这里刻意不覆盖 background。
+   .container 的填充色来自 v-bind(loginOpacity)，是后台「登录透明度」设置，
+   默认 0.88 已经是半透明，配上模糊就是标准的磨砂玻璃。
+   覆盖它会让这个既有设置失效，所以只叠模糊与描边。 */
+#login-box .container {
+	-webkit-backdrop-filter: blur(28px) saturate(var(--glass-saturate));
+	backdrop-filter: blur(28px) saturate(var(--glass-saturate));
+	border: 1px solid var(--glass-hairline);
+	border-radius: var(--glass-radius-lg);
+	box-shadow: var(--glass-shadow-lg);
+}
+
+@media (min-width: 768px) {
+	/* 桌面端：从「贴右满高」改为「右侧悬浮卡」 */
+	#login-box .container {
+		height: fit-content;
+		max-height: calc(100% - 48px);
+		margin-right: 48px;
+		overflow-y: auto;
+	}
+}
+
+@media (max-width: 767px) {
+	#login-box .container {
+		margin-left: 18px;
+		margin-right: 18px;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   8. 细节打磨
+   --------------------------------------------------------------------------- */
+
+/* 滚动条：细、圆、悬停才显形 */
+::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+	background: rgba(148, 163, 184, 0.42);
+	border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: rgba(148, 163, 184, 0.66);
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+/* 侧栏菜单项与顶栏图标：加一点过渡，避免生硬 */
+#app .aside .el-menu-item,
+#app .aside .title {
+	transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+#app .aside .el-menu-item:hover {
+	transform: translateX(2px);
+}
+
+/* 主题切换的径向动画保持原有节奏，这里只让它更顺滑 */
+::view-transition-old(root),
+::view-transition-new(root) {
+	animation-duration: var(--vt-duration);
+}
+
+/* 不支持 backdrop-filter 时退回不透明表面，保证可读性 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+	html:root {
+		--glass-surface: rgba(255, 255, 255, 0.94);
+		--glass-surface-strong: rgba(255, 255, 255, 0.97);
+		--glass-surface-soft: rgba(255, 255, 255, 0.88);
+		--glass-aside-bg: rgba(26, 28, 38, 0.96);
+	}
+
+	html.dark:root {
+		--glass-surface: rgba(24, 27, 36, 0.95);
+		--glass-surface-strong: rgba(29, 33, 43, 0.98);
+		--glass-surface-soft: rgba(24, 27, 36, 0.90);
+		--glass-aside-bg: rgba(15, 17, 24, 0.97);
+	}
+}
+
+/* 尊重系统的「减少动态效果」 */
+@media (prefers-reduced-motion: reduce) {
+	#app .aside .el-menu-item:hover,
+	#app .el-button--primary:hover {
+		transform: none;
+	}
+}

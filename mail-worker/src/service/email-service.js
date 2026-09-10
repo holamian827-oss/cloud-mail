@@ -60,8 +60,16 @@ const emailService = {
 			size = 50;
 		}
 
+		// 下限钳制：size 为负数时 SQLite 的 LIMIT -1 会退化为全表扫描
+		if (size < 1) {
+			size = 10;
+		}
+
 		if (isNaN(allReceive)) {
 			let accountRow = await accountService.selectById(c, accountId);
+			if (!accountRow) {
+				throw new BizError(t('notExistAccount'));
+			}
 			allReceive = accountRow.allReceive;
 		}
 
@@ -223,22 +231,30 @@ const emailService = {
 		const emailIdList = emailIds.split(',').map(Number);
 		const { syncDelete } = await settingService.query(c);
 
+		// in 查询受 D1 100 个绑定参数限制，按每批 90 个 id 分片执行
+		const batchSize = 90;
+
 		if (syncDelete === settingConst.syncDelete.OPEN) {
-			const owned = await orm(c).select({ emailId: email.emailId }).from(email)
-				.where(and(eq(email.userId, userId), inArray(email.emailId, emailIdList)))
-				.all();
-			const ownedIds = owned.map(row => row.emailId);
-			if (ownedIds.length) {
-				await this.physicsDelete(c, { emailIds: ownedIds.join(',') });
+			for (let i = 0; i < emailIdList.length; i += batchSize) {
+				const ids = emailIdList.slice(i, i + batchSize);
+				const owned = await orm(c).select({ emailId: email.emailId }).from(email)
+					.where(and(eq(email.userId, userId), inArray(email.emailId, ids)))
+					.all();
+				const ownedIds = owned.map(row => row.emailId);
+				if (ownedIds.length) {
+					await this.physicsDelete(c, { emailIds: ownedIds.join(',') });
+				}
 			}
 			return;
 		}
 
-		await orm(c).update(email).set({ isDel: isDel.DELETE }).where(
-			and(
-				eq(email.userId, userId),
-				inArray(email.emailId, emailIdList)))
-			.run();
+		for (let i = 0; i < emailIdList.length; i += batchSize) {
+			await orm(c).update(email).set({ isDel: isDel.DELETE }).where(
+				and(
+					eq(email.userId, userId),
+					inArray(email.emailId, emailIdList.slice(i, i + batchSize))))
+				.run();
+		}
 	},
 
 	receive(c, params, cidAttList, r2domain) {
@@ -462,6 +478,8 @@ const emailService = {
 		let daySendTotal = await c.env.kv.get(kvConst.SEND_DAY_COUNT + dateStr);
 
 		//记录每天发件次数统计
+		//注意：KV 不支持原子自增，这里是"读-加-写"，并发发信时会丢计数，仅作为有损的近似统计值展示；
+		//若要精确计数需改为 D1 的 INSERT ... ON CONFLICT DO UPDATE SET count = count + 1（需新增表与迁移，代价较大）
 		if (!daySendTotal) {
 			await c.env.kv.put(kvConst.SEND_DAY_COUNT + dateStr, JSON.stringify(receiveEmail.length), { expirationTtl: 60 * 60 * 24 });
 		} else  {
@@ -642,8 +660,16 @@ const emailService = {
 
 		const { noRecipient  } = await settingService.query(c);
 
+		// in 查询受 D1 100 个绑定参数限制，按每批 90 个收件人分片查询后合并
+		const batchSize = 90;
+
 		//查询所有收件人账号信息
-		let accountList = await orm(c).select().from(account).where(inArray(account.email, receiveEmail)).all();
+		let accountList = [];
+
+		for (let i = 0; i < receiveEmail.length; i += batchSize) {
+			const rows = await orm(c).select().from(account).where(inArray(account.email, receiveEmail.slice(i, i + batchSize))).all();
+			accountList.push(...rows);
+		}
 
 		// 对于含+未精确匹配的收件人，获取基础地址账号
 		const plusEmails = receiveEmail.filter(
@@ -657,9 +683,11 @@ const emailService = {
 			const existing = new Set(accountList.map(a => a.email));
 			const needed = baseEmails.filter(e => !existing.has(e));
 			if (needed.length > 0) {
-				const rows = await orm(c).select().from(account)
-					.where(inArray(account.email, needed)).all();
-				baseAccounts.push(...rows);
+				for (let i = 0; i < needed.length; i += batchSize) {
+					const rows = await orm(c).select().from(account)
+						.where(inArray(account.email, needed.slice(i, i + batchSize))).all();
+					baseAccounts.push(...rows);
+				}
 			}
 		}
 
@@ -830,6 +858,9 @@ const emailService = {
 
 		if (isNaN(allReceive)) {
 			let accountRow = await accountService.selectById(c, accountId);
+			if (!accountRow) {
+				throw new BizError(t('notExistAccount'));
+			}
 			allReceive = accountRow.allReceive;
 		}
 
@@ -860,14 +891,27 @@ const emailService = {
 	async physicsDelete(c, params) {
 		let { emailIds } = params;
 		emailIds = emailIds.split(',').map(Number);
-		await attService.removeByEmailIds(c, emailIds);
-		await starService.removeByEmailIds(c, emailIds);
-		await orm(c).delete(email).where(inArray(email.emailId, emailIds)).run();
+
+		// in 查询受 D1 100 个绑定参数限制，按每批 90 个 id 分片执行
+		const batchSize = 90;
+
+		for (let i = 0; i < emailIds.length; i += batchSize) {
+			const ids = emailIds.slice(i, i + batchSize);
+			await attService.removeByEmailIds(c, ids);
+			await starService.removeByEmailIds(c, ids);
+			await orm(c).delete(email).where(inArray(email.emailId, ids)).run();
+		}
 	},
 
 	async physicsDeleteUserIds(c, userIds) {
-		await attService.removeByUserIds(c, userIds);
-		await orm(c).delete(email).where(inArray(email.userId, userIds)).run();
+		// in 查询受 D1 100 个绑定参数限制，按每批 90 个 id 分片执行
+		const batchSize = 90;
+
+		for (let i = 0; i < userIds.length; i += batchSize) {
+			const ids = userIds.slice(i, i + batchSize);
+			await attService.removeByUserIds(c, ids);
+			await orm(c).delete(email).where(inArray(email.userId, ids)).run();
+		}
 	},
 
 	updateEmailStatus(c, params) {
@@ -914,6 +958,11 @@ const emailService = {
 
 		if (size > 50) {
 			size = 50;
+		}
+
+		// 下限钳制：size 为负数时 SQLite 的 LIMIT -1 会退化为全表扫描
+		if (size < 1) {
+			size = 10;
 		}
 
 		if (isNaN(full)) {
@@ -1142,8 +1191,14 @@ const emailService = {
 	},
 
 	async read(c, params, userId) {
-		const { emailIds } = params;
-		await orm(c).update(email).set({ unread: emailConst.unread.READ }).where(and(eq(email.userId, userId), inArray(email.emailId, emailIds)));
+		const emailIds = params.emailIds || [];
+
+		// in 查询受 D1 100 个绑定参数限制，按每批 90 个 id 分片执行
+		const batchSize = 90;
+
+		for (let i = 0; i < emailIds.length; i += batchSize) {
+			await orm(c).update(email).set({ unread: emailConst.unread.READ }).where(and(eq(email.userId, userId), inArray(email.emailId, emailIds.slice(i, i + batchSize))));
+		}
 	}
 };
 

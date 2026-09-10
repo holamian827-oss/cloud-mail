@@ -13,6 +13,9 @@ import telegramService from '../service/telegram-service';
 import aiService from '../service/ai-service';
 import webhookService from '../service/webhook-service';
 
+// 单封邮件附件数量上限，超限直接拒收
+const MAX_ATTACHMENT_COUNT = 100;
+
 export async function email(message, env, ctx) {
 
 	try {
@@ -130,6 +133,13 @@ export async function email(message, env, ctx) {
 		const attachments = [];
 		const cidAttachments = [];
 
+		// 附件数量上限校验：超限明确拒收，避免后续入库失败导致附件静默丢失
+		if (email.attachments.length > MAX_ATTACHMENT_COUNT) {
+			console.error(`附件数量超限：${email.attachments.length}，最多 ${MAX_ATTACHMENT_COUNT}`);
+			message.setReject('Too many attachments');
+			return;
+		}
+
 		for (let item of email.attachments) {
 			let attachment = { ...item };
 			attachment.key = constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(attachment.content) + fileUtils.getExtFileName(item.filename);
@@ -153,7 +163,8 @@ export async function email(message, env, ctx) {
 				await attService.addAtt({ env }, attachments);
 			}
 		} catch (e) {
-			console.error(e);
+			// 不再静默吞异常：记录明确的错误信息便于定位附件丢失
+			console.error(`保存附件失败（emailId=${emailRow.emailId}，附件数=${attachments.length}）：`, e);
 		}
 
 		emailRow = await emailService.completeReceive({ env }, account ? emailConst.status.RECEIVE : emailConst.status.NOONE, emailRow.emailId);

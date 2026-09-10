@@ -3,6 +3,9 @@ import email from '../entity/email';
 
 export const EMAIL_LIST_TEXT_LEN = 300;
 
+/** brief 列表里 content 的最大长度（去空白后的原始 HTML），避免 text 为空时把整封 HTML 返回给列表 */
+export const EMAIL_LIST_CONTENT_LEN = 3000;
+
 /** 去掉换行/回车/制表符，并压缩连续空格、标签间空白 */
 function sqlStripWhitespace(column) {
 	return sql`trim(replace(replace(replace(replace(replace(replace(
@@ -33,6 +36,6 @@ export const emailBriefColumns = {
 	unread: email.unread,
 	createTime: email.createTime,
 	isDel: email.isDel,
-	content: sql`CASE WHEN trim(coalesce(${email.text}, '')) != '' THEN NULL ELSE ${sqlStripWhitespace(email.content)} END`.as('content'),
+	content: sql`CASE WHEN trim(coalesce(${email.text}, '')) != '' THEN NULL ELSE substr(${sqlStripWhitespace(email.content)}, 1, ${EMAIL_LIST_CONTENT_LEN}) END`.as('content'),
 	text: sql`substr(coalesce(${email.text}, ''), 1, ${EMAIL_LIST_TEXT_LEN})`.as('text'),
 };

@@ -40,6 +40,8 @@ const en = {
 	regKeyExpire: 'Invite code has expired',
 	emailAndPwdEmpty: 'Email and password cannot be empty',
 	notExistUser: 'Email does not exist',
+	notExistAccount: 'Email account does not exist',
+	timeZoneInvalid: 'Invalid timezone',
 	isDelUser: 'This email has been deleted',
 	isBanUser: 'This email has been banned',
 	regKeyUseCount: 'Usage count cannot be empty',
@@ -68,6 +70,7 @@ const en = {
 	notAdmin: 'The entered email is not an administrator email',
 	emailExistDatabase: 'Email already exists in the database',
 	notConfigOss: 'Object storage not configured',
+	tooManyAttempts: 'Too many attempts, please try again later',
 	perms: {
 		"邮件": "Emails",
 		"邮件发送": "Send Email",

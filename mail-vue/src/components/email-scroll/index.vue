@@ -237,7 +237,7 @@
 <script setup>
 import {Icon} from "@iconify/vue";
 import skeletonBlock from "@/components/email-scroll/skeleton/index.vue"
-import {computed, onActivated, reactive, ref, watch, nextTick, onMounted, onUnmounted } from "vue";
+import {computed, onActivated, onDeactivated, reactive, ref, watch, nextTick, onMounted, onUnmounted } from "vue";
 import {useEmailStore} from "@/store/email.js";
 import {useUiStore} from "@/store/ui.js";
 import {useSettingStore} from "@/store/setting.js";
@@ -359,6 +359,7 @@ defineExpose({
 })
 
 onActivated(() => {
+  window.addEventListener('resize', handleResize)
   requestAnimationFrame(() => {
     const index = scrollTop / itemHeight.value
     scrollbarRef.value?.scrollTo(index);
@@ -375,13 +376,20 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearInterval(timer)
+  window.removeEventListener('resize', handleResize)
 })
+
+onDeactivated(() => {
+  window.removeEventListener('resize', handleResize)
+})
+
+function handleResize() {
+  isMobile.value = innerWidth < 1367
+}
 
 getEmailList()
 
-window.onresize = () => {
-  isMobile.value = innerWidth < 1367
-}
+window.addEventListener('resize', handleResize)
 
 function onScroll(e) {
   scrollTop = e.target.scrollTop;
@@ -452,7 +460,7 @@ watch(() => arrivedState.bottom, (isBottom) => {
 watch(
     () => emailList.map(item => item.checked),
     () => {
-      checkedEmailCount.value = emailList.length
+      checkedEmailCount.value = emailList.filter(item => item.checked).length
       if (emailList.length > 0) {
         updateCheckStatus();
       }
@@ -687,13 +695,12 @@ function handleDelete() {
 }
 
 function deleteEmail(emailIds) {
-  emailIds.forEach(emailId => {
-    emailList.forEach((item, index) => {
-      if (emailId === item.emailId) {
-        emailList.splice(index, 1);
-      }
-    })
-  })
+  const remainList = emailList.filter(item => !emailIds.includes(item.emailId))
+  const delCount = emailList.length - remainList.length
+  emailList.splice(0, emailList.length, ...remainList)
+  if (delCount > 0 && total.value > 0) {
+    total.value -= delCount
+  }
   if (emailList.length < queryParam.size && !noLoading.value) {
     getEmailList()
   }
@@ -871,6 +878,7 @@ function handleList(list) {
       4: { icon: 'bi:send-exclamation-fill', color: '#FBBD08', content: t('complained') },
       5: { icon: 'bi:send-arrow-up-fill',  color: '#FBBD08', content: t('delayed') },
       7: { icon: 'ic:round-mark-email-read', color: '#FBBD08', content: t('noRecipient') },
+      6: { icon: 'mdi:email-outline',       color: '#FBBD08', content: t('saving') },
     };
 
     if (email.isDel) {

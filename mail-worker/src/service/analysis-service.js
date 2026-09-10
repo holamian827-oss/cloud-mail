@@ -6,14 +6,18 @@ import { emailConst } from '../const/entity-const';
 import kvConst from '../const/kv-const';
 import dayjs from 'dayjs';
 import { toUtc } from '../utils/date-uitil';
+import BizError from '../error/biz-error';
+import { t } from '../i18n/i18n';
 const analysisService = {
 
 	async echarts(c, params) {
+		const queryParams = { ...params, timeZone: this.checkTimeZone(params.timeZone) };
+
 		if (!this.analysisCacheEnabled(c)) {
-			return await this.queryEcharts(c, params);
+			return await this.queryEcharts(c, queryParams);
 		}
 
-		const cacheKey = this.echartsCacheKey(params);
+		const cacheKey = this.echartsCacheKey(queryParams);
 		const cache = await c.env.kv.get(cacheKey, { type: 'json' });
 
 		if (cache) {
@@ -21,6 +25,25 @@ const analysisService = {
 		}
 
 		return await this.refreshEchartsCacheByKey(c, cacheKey);
+	},
+
+	// 校验时区：非法值直接抛业务错误，避免拼进 KV key 或让 dayjs.tz 抛 RangeError
+	checkTimeZone(timeZone) {
+		if (!timeZone) {
+			return 'UTC';
+		}
+
+		if (typeof timeZone !== 'string' || !/^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z0-9_+-]+)*$/.test(timeZone)) {
+			throw new BizError(t('timeZoneInvalid'));
+		}
+
+		try {
+			toUtc().tz(timeZone);
+		} catch (e) {
+			throw new BizError(t('timeZoneInvalid'));
+		}
+
+		return timeZone;
 	},
 
 	async refreshEchartsCacheByKey(c, cacheKey) {
@@ -35,14 +58,23 @@ const analysisService = {
 			return;
 		}
 
-		const { keys } = await c.env.kv.list({ prefix: kvConst.ANALYSIS_ECHARTS });
+		// kv.list 单次最多返回 1000 条，需要翻页取全，避免缓存刷新不完整
+		let cursor;
 
-		await Promise.all(keys.map(key => this.refreshEchartsCacheByKey(c, key.name)));
+		do {
+			const result = await c.env.kv.list({ prefix: kvConst.ANALYSIS_ECHARTS, cursor });
+
+			await Promise.all((result.keys || []).map(key =>
+				this.refreshEchartsCacheByKey(c, key.name)
+					.catch(e => console.error('刷新分析缓存失败：', key.name, e))));
+
+			cursor = result.list_complete ? null : result.cursor;
+		} while (cursor);
 	},
 
 	async queryEcharts(c, params) {
 
-		const { timeZone } = params;
+		const timeZone = this.checkTimeZone(params.timeZone);
 
 		let utcDate = toUtc().startOf('day');
 

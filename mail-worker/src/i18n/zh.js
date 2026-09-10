@@ -40,6 +40,8 @@ const zh = {
 	regKeyExpire: '注册码已过期',
 	emailAndPwdEmpty: '邮箱和密码不能为空',
 	notExistUser: '输入的邮箱不存在',
+	notExistAccount: '邮箱账号不存在',
+	timeZoneInvalid: '时区不合法',
 	isDelUser: '该邮箱已被注销',
 	isBanUser: '该邮箱已被禁用',
 	regKeyUseCount: '使用次数不能为空',
@@ -68,6 +70,7 @@ const zh = {
 	notAdmin: '输入的邮箱不是管理员邮箱',
 	emailExistDatabase: '有邮箱已存在数据库中',
 	notConfigOss: '对象存储未配置',
+	tooManyAttempts: '操作过于频繁,请稍后再试',
 	perms: {
 		"邮件": "邮件",
 		"邮件发送": "邮件发送",

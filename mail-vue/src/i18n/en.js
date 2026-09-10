@@ -120,6 +120,7 @@ const en = {
     complained: 'Complained',
     delayed: 'Delayed',
     bounced: 'Bounced',
+    saving: 'Receiving',
     attachments: 'Attachments',
     attCount: 'Total {total}',
     emailCount: 'Total {total}',

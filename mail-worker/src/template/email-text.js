@@ -1,3 +1,13 @@
+// 纯文本正文需完整HTML转义后再插入页面,防止存储型XSS(注意 & 必须最先替换)
+function escapeHtml(text = '') {
+	return String(text)
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
+}
+
 export default function emailTextTemplate(text) {
 	return `<!DOCTYPE html>
 <html lang='en' >
@@ -29,7 +39,7 @@ export default function emailTextTemplate(text) {
     </style>
 </head>
 <body>
-<span>${text}</span>
+<span>${escapeHtml(text)}</span>
 </body>
 </html>`
 }

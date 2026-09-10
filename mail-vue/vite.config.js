@@ -28,14 +28,35 @@ export default defineConfig(({mode}) => {
                             src: 'mail-pwa.png',
                             sizes: '192x192',
                             type: 'image/png',
+                        },
+                        {
+                            src: 'mail-pwa-512.png',
+                            sizes: '512x512',
+                            type: 'image/png',
                         }
                     ],
                 },
                 workbox: {
                     disableDevLogs: true,
-                    globPatterns: [],
-                    runtimeCaching: [],
-                    navigateFallback: null,
+                    globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+                    // tinymce 体积较大(约 4.5M)，不参与预缓存，改为运行时缓存
+                    globIgnores: ['**/tinymce/**'],
+                    // history 路由：非 /api 的导航请求回退到 index.html
+                    navigateFallback: 'index.html',
+                    navigateFallbackDenylist: [/^\/api/],
+                    runtimeCaching: [
+                        {
+                            urlPattern: /\/tinymce\/.*\.(?:js|css|woff2?|svg|png|gif)$/,
+                            handler: 'CacheFirst',
+                            options: {
+                                cacheName: 'tinymce-assets',
+                                expiration: {
+                                    maxEntries: 300,
+                                    maxAgeSeconds: 60 * 60 * 24 * 30
+                                }
+                            }
+                        }
+                    ],
                     cleanupOutdatedCaches: true,
                 }
             }),

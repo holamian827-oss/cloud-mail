@@ -128,18 +128,30 @@ function loadBackground(next) {
         const img = new Image();
         img.src = src;
 
-        img.onload = () => {
+        // 三条路径(onload/onerror/超时)只允许放行一次，避免 next() 被多次调用
+        let timeoutId = null
+        let finished = false
+        const finish = () => {
+            if (finished) {
+                return
+            }
+            finished = true
+            clearTimeout(timeoutId)
             next()
+        }
+
+        img.onload = () => {
+            finish()
         };
 
         img.onerror = () => {
             console.warn("背景图片加载失败:", img.src);
-            next()
+            finish()
         };
 
-        setTimeout(() => {
+        timeoutId = setTimeout(() => {
             console.warn("背景加载超时，已放行");
-            next()
+            finish()
         }, 3000)
 
     } else {
