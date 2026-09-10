@@ -52,19 +52,18 @@ export default {
 			);
 		}
 
-		// 介绍页对外只暴露干净地址 /about。
-		// 静态文件本身叫 about.html（Vite 会把 public/ 原样拷进产物），
-		// 这里做一次重写，并把 /about.html 301 过去 ——
-		// 同一份内容有两个地址属于重复内容，对收录不利，所以要收敛成一个。
-		if (url.pathname === '/about' || url.pathname === '/about/') {
-			url.pathname = '/about.html';
-			return env.assets.fetch(new Request(url.toString(), req));
-		}
-
-		if (url.pathname === '/about.html') {
-			url.pathname = '/about';
-			return Response.redirect(url.toString(), 301);
-		}
+		// 介绍页的干净地址 /about **刻意不在这里做重写**。
+		//
+		// 静态资源层的默认 html_handling（auto-trailing-slash）本来就提供这两个行为：
+		//     /about       → 200，返回 dist/about.html
+		//     /about.html  → 307 跳转到 /about
+		// 也就是说「无扩展名地址 + 扩展名收敛」平台已经做好了。
+		//
+		// 曾经这里手写过一遍，结果造成了无限重定向：
+		//   浏览器请求 /about → 这里重写成 /about.html 交给资源层 →
+		//   资源层按上面的规则把它 307 跳回 /about → 又回到这里……
+		// 教训：不要重复实现平台已有的路由行为，尤其是会自我引用的那种。
+		// 需要 /about 生效，只要保证 public/about.html 存在即可。
 
 		if (url.pathname.startsWith('/api/')) {
 			url.pathname = url.pathname.replace('/api', '')
