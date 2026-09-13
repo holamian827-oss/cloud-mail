@@ -1,34 +1,30 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en" class="lang-en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Aurax Mail - @aurax.eu.org 域名邮箱服务</title>
-<meta name="description" content="Aurax Mail 提供 @aurax.eu.org 的域名邮箱：可创建任意前缀的邮箱地址，支持多账号、邮件收发、附件与内嵌图片、邮件转发与验证码识别。注册即可使用。"/>
+<title>Aurax Mail - @aurax.eu.org email service</title>
+<meta name="description" content="Aurax Mail provides email on @aurax.eu.org: create any address prefix, multiple accounts, send/receive with attachments and inline images, forwarding and verification-code detection. Sign up for free."/>
 <meta name="robots" content="index, follow"/>
 <meta name="theme-color" content="#F1F3FA"/>
 <meta property="og:type" content="website"/>
-<meta property="og:title" content="Aurax Mail - @aurax.eu.org 域名邮箱服务"/>
-<meta property="og:description" content="用 @aurax.eu.org 创建你自己的邮箱地址，支持多账号、附件收发、邮件转发与验证码识别。"/>
+<meta property="og:title" content="Aurax Mail - @aurax.eu.org email service"/>
+<meta property="og:description" content="Create your own address under @aurax.eu.org — multiple accounts, attachments, forwarding and code detection."/>
 <link rel="icon" href="/mail.png" type="image/png"/>
 
 <!--
   ============================================================================
-  当前内容已按站点实际配置填好：站名 Aurax Mail、域名 @aurax.eu.org、
-  联系方式 admin@aurax.eu.org。
-  要改站名/域名/联系方式，全文搜索下面的字样替换即可。
-  改完无需重新构建，但**要重新部署**才会生效。
+  双语说明：
+  这个页面是「裸 HTML」而不是 Vue 页面，为的是让搜索引擎直接读到完整正文
+  （SPA 首屏只有一个空的 <div id="app">，收录效果差）。所以双语也做成
+  「两种语言文本并存 + CSS 控制显示」，而不是 JS 动态填字 —— 爬虫读到的
+  HTML 里中英文正文都在，切语言只是改一个 class，不碰文本。
 
-  关于访问地址：/about 能打开是因为 Cloudflare 静态资源的默认行为
-  （不带扩展名的请求会返回同名的 .html 文件），不是 worker 里写的重写规则 ——
-  这一点很关键，之前正是因为在 worker 里手写了一遍同样的逻辑，才造成了无限重定向。
-  ============================================================================
+  默认语言：浏览器偏好里任何中文变体（简体 zh-CN / 繁体 zh-TW、zh-HK / 粤语 /
+  新加坡 zh-SG）都归中文，其余一律英文。用户手动切换后写入 localStorage
+  的 setting.lang，和主应用共用，下次打开（包括登录页）记住选择。
 
-  为什么这个页面是「裸 HTML」而不是 Vue 页面：
-    邮件应用本体是单页应用（SPA），首屏 HTML 里只有一个空的 <div id="app">，
-    内容全靠 JS 渲染。搜索引擎虽然能执行 JS，但这类空壳页面的收录效果很差、
-    也不稳定。介绍页做成静态 HTML，爬虫拿到的就是完整内容，收录才有效。
-    所以这个页面刻意不引任何 JS、不依赖构建流程，单独一个文件就能工作。
+  要改站名/域名/联系方式，全文搜索 aurax.eu.org / admin@aurax.eu.org 替换。
   ============================================================================
 -->
 
@@ -48,6 +44,20 @@
     color:#1a1d29;line-height:1.7;-webkit-font-smoothing:antialiased;
   }
   .wrap{max-width:820px;margin:0 auto;padding:72px 24px 96px}
+
+  /* 语言切换：默认（lang-en）显示英文，lang-zh 显示中文 */
+  html.lang-zh .en{display:none}
+  html.lang-en .zh{display:none}
+
+  .lang-toggle{
+    position:fixed;top:16px;right:16px;z-index:10;
+    padding:8px 16px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.8);
+    color:#2b3040;font-size:13px;font-weight:600;font-family:inherit;
+    box-shadow:0 4px 16px rgba(15,23,42,.08);
+    transition:transform .18s ease,box-shadow .2s ease;
+  }
+  .lang-toggle:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(15,23,42,.14)}
 
   .brand{display:flex;align-items:center;gap:12px;margin-bottom:52px}
   .brand img{width:40px;height:40px;border-radius:10px}
@@ -100,10 +110,16 @@
     .domain{background:rgba(76,110,245,.18);color:#b9c6ff}
     .btn-ghost{background:rgba(255,255,255,.07);color:#e8ecf5;border-color:rgba(255,255,255,.14)}
     footer{border-top-color:rgba(255,255,255,.10);color:#818899}
+    .lang-toggle{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.14);color:#e8ecf5}
   }
 </style>
 </head>
 <body>
+<button class="lang-toggle" onclick="toggleAboutLang()" aria-label="Switch language">
+  <span class="zh">English</span>
+  <span class="en">中文</span>
+</button>
+
 <div class="wrap">
 
   <div class="brand">
@@ -111,34 +127,49 @@
     <span>Aurax Mail</span>
   </div>
 
-  <h1>用 <em>@aurax.eu.org</em>，收一封正经的邮件</h1>
+  <h1>
+    <span class="en">Send and receive <em>real email</em> on your own domain</span>
+    <span class="zh">用 <em>@aurax.eu.org</em>，收一封正经的邮件</span>
+  </h1>
 
   <p class="lead">
-    Aurax Mail 是一个基于自有域名的邮箱服务。你可以用 @aurax.eu.org 下的任意前缀创建邮箱地址，
-    收发邮件、带附件、看内嵌图片，全部在浏览器里完成，无需安装任何客户端。
+    <span class="en">Aurax Mail is an email service on your own domain. Create any address under @aurax.eu.org, send and receive mail with attachments and inline images — all in the browser, no client needed.</span>
+    <span class="zh">Aurax Mail 是一个基于自有域名的邮箱服务。你可以用 @aurax.eu.org 下的任意前缀创建邮箱地址，收发邮件、带附件、看内嵌图片，全部在浏览器里完成，无需安装任何客户端。</span>
   </p>
 
   <div class="cta">
-    <a class="btn btn-main" href="/login">注册 / 登录</a>
-    <a class="btn btn-ghost" href="#features">看看有哪些功能</a>
+    <a class="btn btn-main" href="/login">
+      <span class="en">Sign up / Sign in</span>
+      <span class="zh">注册 / 登录</span>
+    </a>
+    <a class="btn btn-ghost" href="#features">
+      <span class="en">See features</span>
+      <span class="zh">看看有哪些功能</span>
+    </a>
   </div>
 
   <section id="features">
-    <h2>能做什么</h2>
+    <h2>
+      <span class="en">What you can do</span>
+      <span class="zh">能做什么</span>
+    </h2>
     <div class="card">
       <ul>
-        <li>用自有域名创建任意数量的邮箱地址，一号一址</li>
-        <li>完整收发邮件，支持附件与正文内嵌图片</li>
-        <li>多账号统一管理，一个界面切换所有邮箱</li>
-        <li>邮件自动转发到其他邮箱或即时通讯工具</li>
-        <li>自动识别邮件里的验证码，不用再翻来翻去</li>
-        <li>支持第三方账号登录，不必额外记一组密码</li>
+        <li><span class="en">Create any number of addresses on your own domain, one address per account</span><span class="zh">用自有域名创建任意数量的邮箱地址，一号一址</span></li>
+        <li><span class="en">Full send and receive, with attachments and inline images</span><span class="zh">完整收发邮件，支持附件与正文内嵌图片</span></li>
+        <li><span class="en">Manage multiple accounts in one place</span><span class="zh">多账号统一管理，一个界面切换所有邮箱</span></li>
+        <li><span class="en">Auto-forward mail to other inboxes or messaging tools</span><span class="zh">邮件自动转发到其他邮箱或即时通讯工具</span></li>
+        <li><span class="en">Auto-detect verification codes in your mail</span><span class="zh">自动识别邮件里的验证码，不用再翻来翻去</span></li>
+        <li><span class="en">Sign in with third-party accounts — no extra password to remember</span><span class="zh">支持第三方账号登录，不必额外记一组密码</span></li>
       </ul>
     </div>
   </section>
 
   <section>
-    <h2>支持的邮箱域名</h2>
+    <h2>
+      <span class="en">Supported email domains</span>
+      <span class="zh">支持的邮箱域名</span>
+    </h2>
     <div class="card">
       <div class="domains">
         <span class="domain">@aurax.eu.org</span>
@@ -147,24 +178,82 @@
   </section>
 
   <section>
-    <h2>怎么开始</h2>
+    <h2>
+      <span class="en">How to get started</span>
+      <span class="zh">怎么开始</span>
+    </h2>
     <div class="card">
       <ul>
-        <li>打开登录页，注册一个邮箱地址</li>
-        <li>登录后即可收发邮件、添加更多邮箱地址</li>
+        <li><span class="en">Open the login page and register an address</span><span class="zh">打开登录页，注册一个邮箱地址</span></li>
+        <li><span class="en">Send and receive mail, and add more addresses after signing in</span><span class="zh">登录后即可收发邮件、添加更多邮箱地址</span></li>
       </ul>
       <div class="cta">
-        <a class="btn btn-main" href="/login">现在就去注册</a>
+        <a class="btn btn-main" href="/login">
+          <span class="en">Sign up now</span>
+          <span class="zh">现在就去注册</span>
+        </a>
       </div>
     </div>
   </section>
 
   <footer>
     <p>
-      Aurax Mail · 管理员联系方式：<a href="mailto:admin@aurax.eu.org">admin@aurax.eu.org</a>
+      <span class="en">Aurax Mail · Contact admin: </span>
+      <span class="zh">Aurax Mail · 管理员联系方式：</span>
+      <a href="mailto:admin@aurax.eu.org">admin@aurax.eu.org</a>
     </p>
   </footer>
 
 </div>
+
+<script>
+(function () {
+  var TITLE = {
+    zh: 'Aurax Mail - @aurax.eu.org 域名邮箱服务',
+    en: 'Aurax Mail - @aurax.eu.org email service'
+  };
+  var DESC = {
+    zh: 'Aurax Mail 提供 @aurax.eu.org 的域名邮箱：可创建任意前缀的邮箱地址，支持多账号、邮件收发、附件与内嵌图片、邮件转发与验证码识别。注册即可使用。',
+    en: 'Aurax Mail provides email on @aurax.eu.org: create any address prefix, multiple accounts, send/receive with attachments and inline images, forwarding and verification-code detection. Sign up for free.'
+  };
+
+  // 和主应用一致的记住语言：读/写 localStorage 的 setting.lang
+  function readSavedLang() {
+    try {
+      var s = localStorage.getItem('setting');
+      if (s) {
+        var j = JSON.parse(s);
+        if (j.lang === 'zh' || j.lang === 'en') return j.lang;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function detectLang() {
+    var saved = readSavedLang();
+    if (saved) return saved;
+    // 浏览器偏好里任何中文变体都归中文，其余默认英文（与主应用 init.js 一致）
+    var langs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language];
+    var isZh = langs.some(function (l) { return String(l).toLowerCase().indexOf('zh') === 0; });
+    return isZh ? 'zh' : 'en';
+  }
+
+  function apply(lang) {
+    document.documentElement.className = 'lang-' + lang;
+    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+    document.title = TITLE[lang];
+    var meta = document.querySelector('meta[name="description"]');
+    if (meta) meta.setAttribute('content', DESC[lang]);
+    try { localStorage.setItem('setting', JSON.stringify({ lang: lang })); } catch (e) {}
+  }
+
+  window.toggleAboutLang = function () {
+    var current = document.documentElement.className.indexOf('lang-en') === 0 ? 'en' : 'zh';
+    apply(current === 'zh' ? 'en' : 'zh');
+  };
+
+  apply(detectLang());
+})();
+</script>
 </body>
 </html>
