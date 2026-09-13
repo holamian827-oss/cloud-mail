@@ -19,6 +19,9 @@
       <div class="notice icon-item" @click="openNotice">
         <Icon icon="streamline-plump:announcement-megaphone"/>
       </div>
+      <div class="lang-item icon-item" @click="toggleLang" :title="settingStore.lang === 'en' ? '切换到中文' : 'Switch to English'">
+        {{ settingStore.lang === 'en' ? '中文' : 'EN' }}
+      </div>
       <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
         <div class="avatar" @click="userInfoHide" >
           <div class="avatar-text">
@@ -83,7 +86,7 @@ import {computed, ref} from "vue";
 import {useSettingStore} from "@/store/setting.js";
 import {hasPerm} from "@/perm/perm.js"
 import {useI18n} from "vue-i18n";
-import {setExtend} from "@/utils/day.js"
+import {toggleLang} from "@/utils/lang.js"
 
 const {t} = useI18n();
 const route = useRoute();
@@ -179,11 +182,6 @@ async function copyEmail(email) {
       plain: true,
     })
   }
-}
-
-function changeLang(lang) {
-  setExtend(lang === 'en' ? 'en' : 'zh-cn')
-  settingStore.lang = lang
 }
 
 function openNotice() {
@@ -439,6 +437,13 @@ function formatName(email) {
   .notice {
     font-size: 22px;
     margin-right: 4px;
+  }
+
+  .lang-item {
+    font-size: 12px;
+    font-weight: 600;
+    user-select: none;
+    letter-spacing: 0.3px;
   }
 
   .dark-icon {

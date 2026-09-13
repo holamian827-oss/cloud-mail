@@ -1,5 +1,5 @@
 <template>
-  <div id="login-box" :style=" background ? 'background: var(--el-bg-color)' : ''" v-loading="oauthLoading" element-loading-text="登录中...">
+  <div id="login-box" :style=" background ? 'background: var(--el-bg-color)' : ''" v-loading="oauthLoading" :element-loading-text="$t('oauthLoadingText')">
     <div id="background-wrap" v-if="!settingStore.settings.background">
       <div class="x1 cloud"></div>
       <div class="x2 cloud"></div>
@@ -10,6 +10,9 @@
     <div v-else :style="background"></div>
     <div class="form-wrapper">
       <div class="container">
+        <div class="lang-switch" @click="toggleLang">
+          {{ settingStore.lang === 'en' ? '中文' : 'English' }}
+        </div>
         <span class="form-title">{{ settingStore.settings.title }}</span>
         <span class="form-desc" v-if="show === 'login'">{{ $t('loginTitle') }}</span>
         <span class="form-desc" v-else>{{ $t('regTitle') }}</span>
@@ -124,7 +127,7 @@
         </div>
       </div>
     </div>
-    <el-dialog class="bind-dialog" v-model="showBindForm"  title="注册邮箱" >
+    <el-dialog class="bind-dialog" v-model="showBindForm"  :title="$t('bindTitle')" >
       <div class="bind-container">
         <el-input :class="!hideLoginDomain ? 'email-input' : ''" v-model="bindForm.email" type="text" :placeholder="$t('emailAccount')" autocomplete="off" @keyup.enter="bind">
           <template #append v-if="!hideLoginDomain">
@@ -161,7 +164,7 @@
              data-error-callback="onBindTurnstileError"
         ></div>
         <el-button class="btn" type="primary" @click="bind" :loading="bindLoading"
-        >绑定
+        >{{ $t('bindBtn') }}
         </el-button>
       </div>
     </el-dialog>
@@ -177,6 +180,7 @@ import {register} from "@/request/login.js";
 import {websiteConfig} from "@/request/setting.js";
 import {isEmail} from "@/utils/verify-utils.js";
 import {encryptPassword} from "@/utils/password-crypto.js";
+import {toggleLang} from "@/utils/lang.js";
 import {useSettingStore} from "@/store/setting.js";
 import {useAccountStore} from "@/store/account.js";
 import {useUserStore} from "@/store/user.js";
@@ -434,7 +438,7 @@ async function oauthGetUser() {
       renderBindTurnstile()
       oauthLoading.value = false
       ElMessage({
-        message: '请注册绑定一个邮箱',
+        message: t('bindEmailMsg'),
         type: 'warning',
         duration: 4000,
         plain: true,
@@ -831,6 +835,20 @@ async function submitRegister() {
   .form-title {
     font-weight: bold;
     font-size: 22px !important;
+  }
+
+  .lang-switch {
+    text-align: right;
+    font-size: 13px;
+    color: var(--form-desc-color);
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 6px;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: var(--el-color-primary);
+    }
   }
 
   .switch {

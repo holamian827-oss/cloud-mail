@@ -16,9 +16,12 @@ export async function init() {
 
     const token = localStorage.getItem('token');
     if (!settingStore.lang) {
-        let lang = navigator.language.split('-')[0]
-        lang = lang === 'zh' ? lang : 'en'
-        settingStore.lang = lang
+        // 浏览器偏好里有任何中文变体（简体 zh-CN / 繁体 zh-TW、zh-HK / 粤语 / 新加坡 zh-SG …）
+        // 都归为中文，其余语言一律默认英文。
+        // 用 navigator.languages（按用户偏好排序）比单看 language 更准确。
+        const langs = navigator.languages?.length ? navigator.languages : [navigator.language]
+        const isChinese = langs.some(l => String(l).toLowerCase().startsWith('zh'))
+        settingStore.lang = isChinese ? 'zh' : 'en'
     }
 
     i18n.global.locale.value = settingStore.lang

@@ -33,7 +33,7 @@
     <div class="language">
       <div class="title">{{$t('language')}}</div>
       <el-select
-          :model-value="langSelect"
+          :model-value="settingStore.lang"
           class="language-select"
           placeholder="Select"
           @change="changeLang"
@@ -69,6 +69,7 @@ import {accountSetName} from "@/request/account.js";
 import {useAccountStore} from "@/store/account.js";
 import {useI18n} from "vue-i18n";
 import {useSettingStore} from "@/store/setting.js";
+import {applyLang} from "@/utils/lang.js";
 
 const { t } = useI18n()
 const accountStore = useAccountStore()
@@ -77,7 +78,6 @@ const userStore = useUserStore();
 const setPwdLoading = ref(false)
 const setNameShow = ref(false)
 const accountName = ref(null)
-const langSelect = ref(settingStore.lang)
 
 defineOptions({
   name: 'setting'
@@ -123,14 +123,7 @@ function setName() {
 }
 
 function changeLang(lang) {
-  let setting = {}
-  try {
-    setting = JSON.parse(localStorage.getItem('setting') || '{}')
-  } catch (e) {
-    setting = {}
-  }
-  localStorage.setItem('setting', JSON.stringify({...setting, lang}))
-  window.location.reload()
+  applyLang(lang)
 }
 
 const pwdShow = ref(false)
